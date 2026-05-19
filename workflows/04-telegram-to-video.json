@@ -16,7 +16,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const msg = $input.first().json.message;\nconst chatId = msg?.chat?.id?.toString();\nconst text = (msg?.text || '').trim();\nconst userId = msg?.from?.id?.toString();\n\nif (!chatId || !text) return [];\n\n// Читаем состояние из staticData\nconst state = $getWorkflowStaticData('global');\nconst userState = state[chatId] || { step: 'idle' };\n\nlet action = 'unknown';\nlet payload = {};\n\nif (text === '/start') {\n  action = 'start';\n} else if (text === '/cancel') {\n  action = 'cancel';\n} else if (userState.step === 'idle') {\n  // Новый черновик сценария\n  if (text.length < 20) {\n    action = 'too_short';\n  } else if (text.length > 2000) {\n    action = 'too_long';\n    payload.length = text.length;\n  } else {\n    action = 'new_script';\n    payload.script = text;\n  }\n} else if (userState.step === 'waiting_approval') {\n  const lower = text.toLowerCase();\n  if (lower === 'ок' || lower === 'ok' || lower === 'да' || lower === 'го' || lower === '👍') {\n    action = 'approved';\n    payload.polishedScript = userState.polishedScript;\n  } else {\n    // Пользователь прислал правки\n    action = 'revision';\n    payload.originalScript = userState.originalScript;\n    payload.polishedScript = userState.polishedScript;\n    payload.feedback = text;\n  }\n} else {\n  action = 'unexpected';\n}\n\nreturn [{\n  json: {\n    action,\n    chatId,\n    userId,\n    text,\n    payload,\n    userState\n  }\n}];"
+        "jsCode": "const msg = $input.first().json.message;\nconst chatId = msg?.chat?.id?.toString();\nconst text = (msg?.text || '').trim();\nconst userId = msg?.from?.id?.toString();\n\nif (!chatId || !text) return [];\n\nconst state = $getWorkflowStaticData('global');\nconst userState = state[chatId] || { step: 'idle' };\n\nlet action = 'unknown';\nlet payload = {};\n\nif (text === '/start') {\n  action = 'start';\n  state[chatId] = { step: 'idle' };\n} else if (text === '/cancel') {\n  action = 'cancel';\n  state[chatId] = { step: 'idle' };\n} else if (userState.step === 'idle') {\n  if (text.length < 20) {\n    action = 'too_short';\n  } else if (text.length > 2000) {\n    action = 'too_long';\n    payload.length = text.length;\n  } else {\n    action = 'new_script';\n    payload.script = text;\n  }\n} else if (userState.step === 'waiting_approval') {\n  const lower = text.toLowerCase();\n  if (lower === 'да' || lower === 'ok' || lower === 'ок' || lower === 'го' || lower === '👍') {\n    action = 'approved';\n    payload.polishedScript = userState.polishedScript;\n  } else {\n    action = 'revision';\n    payload.originalScript = userState.originalScript;\n    payload.polishedScript = userState.polishedScript;\n    payload.feedback = text;\n  }\n} else if (userState.step === 'waiting_new_video') {\n  const lower = text.toLowerCase();\n  if (lower === 'да' || lower === 'yes' || lower === '👍') {\n    action = 'want_new';\n    state[chatId] = { step: 'idle' };\n  } else if (lower === 'нет' || lower === 'no' || lower === '👎') {\n    action = 'no_new';\n    state[chatId] = { step: 'idle' };\n  } else {\n    action = 'unexpected_new_video';\n  }\n} else {\n  action = 'unexpected';\n}\n\nreturn [{ json: { action, chatId, userId, text, payload, userState } }];"
       },
       "id": "tg-02",
       "name": "Code: Определить действие",
@@ -94,7 +94,7 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "={{ $json.action === 'too_short' ? '❌ Сценарий слишком короткий. Минимум 20 символов — отправьте более длинный текст.' : $json.action === 'too_long' ? '❌ Сценарий слишком длинный (у вас ' + ($json.payload?.length || '') + ' симв., максимум 2000). Сократите текст.' : ['👋 Привет! Отправьте мне черновик сценария для аватара.', '', 'Я его отполирую через GPT и покажу вам — вы сможете одобрить или попросить правки.', '', 'Ограничения: 20–2000 символов.'].join('\n') }}",
+        "text": "={{ $json.action === 'too_short' ? '❌ Сценарий слишком короткий. Минимум 20 символов — отправьте более длинный текст.' : $json.action === 'too_long' ? '❌ Сценарий слишком длинный (у вас ' + ($json.payload?.length || '') + ' симв., максимум 2000). Сократите текст.' : $json.action === 'want_new' ? '📝 Отлично! Отправьте новый сценарий — я готов к работе.' : $json.action === 'no_new' ? '👌 Хорошо, буду ждать! Когда захотите снова — просто напишите /start' : $json.action === 'unexpected_new_video' ? '❓ Не понял ответ. Напишите Да чтобы создать новое видео или Нет чтобы завершить.' : ['👋 Привет! Отправьте мне черновик сценария для аватара.', '', 'Я его отполирую через GPT и покажу вам — вы сможете одобрить или попросить правки.', '', 'Ограничения: 20–2000 символов.'].join('\n') }}",
         "additionalFields": {}
       },
       "id": "tg-06",
@@ -172,7 +172,7 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "=✅ Готово! Вот отполированный сценарий:\n\n──────────────\n{{ $json.polished }}\n──────────────\n\nОтправьте *ок* чтобы запустить рендер видео.\nИли напишите правки — я переделаю.",
+        "text": "=✅ Готово! Вот отполированный сценарий:\n\n──────────────\n{{ $json.polished }}\n──────────────\n\nНапишите *Да* — запущу генерацию видео.\nИли напишите правки — я переделаю.",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -197,7 +197,7 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "⏳ Сценарий одобрен! Генерирую аудио через ElevenLabs...",
+        "text": "⏳ Принято! Пожалуйста, подождите — генерирую видео. Я напишу, как только оно будет готово!",
         "additionalFields": {}
       },
       "id": "tg-13",
@@ -408,7 +408,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const json = $input.first().json;\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);\nconst filename = `${timestamp}_avatar.mp4`;\nreturn [{ json: { ...json, filename, savedAt: new Date().toISOString() } }];"
+        "jsCode": "const json = $input.first().json;\nconst state = $getWorkflowStaticData('global');\nstate[json.chatId] = { step: 'waiting_new_video' };\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);\nconst filename = `${timestamp}_avatar.mp4`;\nreturn [{ json: { ...json, filename, savedAt: new Date().toISOString() } }];"
       },
       "id": "tg-26",
       "name": "Code: Подготовить имя файла",
@@ -452,6 +452,18 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [3960, 420]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "🎉 Хотите сгенерировать ещё одно видео?\n\nНапишите *Да* или *Нет*.",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "tg-29",
+      "name": "Telegram: Спросить новое видео",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [4180, 420]
     }
   ],
   "connections": {
@@ -541,6 +553,9 @@
     },
     "Google Sheets: Логировать": {
       "main": [[{ "node": "Telegram: Отправить ссылку", "type": "main", "index": 0 }]]
+    },
+    "Telegram: Отправить ссылку": {
+      "main": [[{ "node": "Telegram: Спросить новое видео", "type": "main", "index": 0 }]]
     }
   },
   "settings": {
