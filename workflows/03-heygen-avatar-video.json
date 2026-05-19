@@ -1,0 +1,275 @@
+{
+  "name": "03 – HeyGen Avatar Video",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Создание видео — HeyGen AI Avatar",
+        "formDescription": "Введите сценарий и настройки — workflow запустит рендер и вернёт ссылку на видео",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Сценарий (текст)",
+              "fieldType": "textarea",
+              "placeholder": "Привет! Я ваш AI-аватар...",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Avatar ID",
+              "fieldType": "text",
+              "placeholder": "получить из HeyGen → Avatars",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Voice ID (HeyGen)",
+              "fieldType": "text",
+              "placeholder": "получить из HeyGen → Voices",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Audio URL (если есть готовый MP3)",
+              "fieldType": "text",
+              "placeholder": "https://... (опционально, заменяет Voice ID)",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Формат",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  { "option": "16:9 (1280×720)" },
+                  { "option": "9:16 (720×1280)" },
+                  { "option": "1:1 (720×720)" }
+                ]
+              },
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Тестовый режим (test=true, бесплатно)",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  { "option": "Да — тест (водяной знак)" },
+                  { "option": "Нет — продакшн" }
+                ]
+              },
+              "requiredField": false
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "lastNode"
+            }
+          }
+        }
+      },
+      "id": "hg-01",
+      "name": "Form: Параметры видео",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [0, 300],
+      "webhookId": "ai-avatar-heygen-video"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const form = $input.first().json;\n\nconst formatMap = {\n  '16:9 (1280×720)': { width: 1280, height: 720, ratio: '16:9' },\n  '9:16 (720×1280)': { width: 720, height: 1280, ratio: '9:16' },\n  '1:1 (720×720)':   { width: 720, height: 720,  ratio: '1:1' }\n};\nconst dim = formatMap[form['Формат']] || formatMap['16:9 (1280×720)'];\n\nconst audioUrl = (form['Audio URL (если есть готовый MP3)'] || '').trim();\nconst voiceId  = (form['Voice ID (HeyGen)'] || '').trim();\nconst isTest   = form['Тестовый режим (test=true, бесплатно)'] !== 'Нет — продакшн';\n\nlet voiceInput;\nif (audioUrl) {\n  voiceInput = { type: 'audio', audio_url: audioUrl };\n} else if (voiceId) {\n  voiceInput = { type: 'text', input_text: form['Сценарий (текст)'], voice_id: voiceId, speed: 1.0 };\n} else {\n  throw new Error('Укажите Voice ID или Audio URL');\n}\n\nconst requestBody = {\n  video_inputs: [\n    {\n      character: {\n        type: 'avatar',\n        avatar_id: form['Avatar ID'],\n        avatar_style: 'normal'\n      },\n      voice: voiceInput,\n      background: {\n        type: 'color',\n        value: '#ffffff'\n      }\n    }\n  ],\n  dimension: { width: dim.width, height: dim.height },\n  aspect_ratio: dim.ratio,\n  test: isTest\n};\n\nreturn [{\n  json: {\n    request_body: requestBody,\n    script_text: form['Сценарий (текст)'],\n    avatar_id: form['Avatar ID'],\n    is_test: isTest,\n    dimension: dim\n  }\n}];"
+      },
+      "id": "hg-02",
+      "name": "Code: Собрать запрос",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [280, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v2/video/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $vars.HEYGEN_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request_body) }}",
+        "options": {}
+      },
+      "id": "hg-03",
+      "name": "HeyGen: Создать видео",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [560, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Poll HeyGen until video is ready (max 20 min)\nconst resp = $input.first().json;\nif (resp.error) throw new Error('HeyGen error: ' + JSON.stringify(resp.error));\n\nconst videoId = resp.data?.video_id;\nif (!videoId) throw new Error('video_id не получен: ' + JSON.stringify(resp));\n\nconst apiKey = $vars.HEYGEN_API_KEY;\nconst maxAttempts = 24;   // 24 × 30s = 12 min\nconst interval = 30000;   // 30 seconds\n\nasync function sleep(ms) {\n  return new Promise(resolve => setTimeout(resolve, ms));\n}\n\nlet status = 'pending';\nlet result = {};\n\nfor (let i = 0; i < maxAttempts; i++) {\n  await sleep(interval);\n\n  const res = await fetch(\n    `https://api.heygen.com/v1/video_status.get?video_id=${videoId}`,\n    { headers: { 'X-Api-Key': apiKey } }\n  );\n  const body = await res.json();\n  result = body.data || {};\n  status = result.status || 'unknown';\n\n  if (status === 'completed' || status === 'failed') break;\n}\n\nreturn [{\n  json: {\n    video_id: videoId,\n    status,\n    video_url: result.video_url || null,\n    thumbnail_url: result.thumbnail_url || null,\n    duration_sec: result.duration || null,\n    error: result.error || null\n  }\n}];"
+      },
+      "id": "hg-04",
+      "name": "Code: Ждать готовности",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-status",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "hg-05",
+      "name": "IF: Видео готово?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "out-1",
+              "name": "status",
+              "value": "success",
+              "type": "string"
+            },
+            {
+              "id": "out-2",
+              "name": "video_url",
+              "value": "={{ $json.video_url }}",
+              "type": "string"
+            },
+            {
+              "id": "out-3",
+              "name": "thumbnail_url",
+              "value": "={{ $json.thumbnail_url }}",
+              "type": "string"
+            },
+            {
+              "id": "out-4",
+              "name": "video_id",
+              "value": "={{ $json.video_id }}",
+              "type": "string"
+            },
+            {
+              "id": "out-5",
+              "name": "duration_sec",
+              "value": "={{ $json.duration_sec }}",
+              "type": "number"
+            },
+            {
+              "id": "out-6",
+              "name": "message",
+              "value": "Видео готово! Скачайте по ссылке video_url.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "hg-06",
+      "name": "Set: Готово — ссылка на видео",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1400, 160]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "err-1",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "err-2",
+              "name": "video_id",
+              "value": "={{ $json.video_id }}",
+              "type": "string"
+            },
+            {
+              "id": "err-3",
+              "name": "heygen_status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "err-4",
+              "name": "error",
+              "value": "={{ $json.error }}",
+              "type": "string"
+            },
+            {
+              "id": "err-5",
+              "name": "message",
+              "value": "Видео не создано. Проверьте video_id вручную в HeyGen или повторите запрос.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "hg-07",
+      "name": "Set: Ошибка",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1400, 440]
+    }
+  ],
+  "connections": {
+    "Form: Параметры видео": {
+      "main": [[{ "node": "Code: Собрать запрос", "type": "main", "index": 0 }]]
+    },
+    "Code: Собрать запрос": {
+      "main": [[{ "node": "HeyGen: Создать видео", "type": "main", "index": 0 }]]
+    },
+    "HeyGen: Создать видео": {
+      "main": [[{ "node": "Code: Ждать готовности", "type": "main", "index": 0 }]]
+    },
+    "Code: Ждать готовности": {
+      "main": [[{ "node": "IF: Видео готово?", "type": "main", "index": 0 }]]
+    },
+    "IF: Видео готово?": {
+      "main": [
+        [{ "node": "Set: Готово — ссылка на видео", "type": "main", "index": 0 }],
+        [{ "node": "Set: Ошибка", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "id": "wf-03-heygen-avatar"
+}

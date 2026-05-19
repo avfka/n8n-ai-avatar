@@ -1,0 +1,155 @@
+{
+  "name": "01 – Script Generator (ChatGPT 4o-mini)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Генератор сценария для AI-аватара",
+        "formDescription": "Введите URL сайта и параметры — получите готовый сценарий для аватара",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "URL сайта",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Имя аватара",
+              "fieldType": "text",
+              "placeholder": "Алекс",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Тема / продукт",
+              "fieldType": "text",
+              "placeholder": "онлайн-курс по Excel",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Длительность (сек)",
+              "fieldType": "number",
+              "placeholder": "60",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Язык",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  { "option": "Русский" },
+                  { "option": "English" }
+                ]
+              },
+              "requiredField": false
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "lastNode"
+            }
+          }
+        }
+      },
+      "id": "sg-01",
+      "name": "Form: Параметры",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [0, 300],
+      "webhookId": "ai-avatar-script-gen"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json['URL сайта'] }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 5
+            }
+          }
+        }
+      },
+      "id": "sg-02",
+      "name": "HTTP: Загрузка сайта",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [280, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Strip HTML, extract clean text, build OpenAI prompt\nconst html = $input.first().json.body || $input.first().json.data || '';\n\nconst siteText = html\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .slice(0, 5000);\n\nconst form = $('Form: Параметры').first().json;\nconst duration = Number(form['Длительность (сек)']) || 60;\nconst wordCount = Math.round(duration * 2.3);\nconst lang = form['Язык'] || 'Русский';\n\nconst systemPrompt = `Ты — профессиональный сценарист для AI-видео аватаров. \nПишешь живые, разговорные сценарии без канцелярита. \nТолько чистый текст для зачитывания — никаких ремарок, скобок, таймкодов.`;\n\nconst userPrompt = `Вот текст с сайта:\\n---\\n${siteText}\\n---\\n\nЗадание: напиши сценарий для AI-аватара по имени ${form['Имя аватара']}.\nТема: ${form['Тема / продукт']}\nДлительность: ${duration} сек (~${wordCount} слов)\nЯзык: ${lang}\n\nТребования:\n- Разговорный стиль, первое лицо\n- Конкретные факты и детали с сайта\n- Чёткий призыв к действию в финале\n- Только текст — никаких заголовков или пояснений`;\n\nreturn [{\n  json: {\n    avatar_name: form['Имя аватара'],\n    topic: form['Тема / продукт'],\n    duration_sec: duration,\n    word_count_target: wordCount,\n    language: lang,\n    system_prompt: systemPrompt,\n    user_prompt: userPrompt\n  }\n}];"
+      },
+      "id": "sg-03",
+      "name": "Code: Подготовить промпт",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [560, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"{{ $json.system_prompt }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.user_prompt }}\"\n    }\n  ],\n  \"temperature\": 0.75,\n  \"max_tokens\": 1000\n}",
+        "options": {}
+      },
+      "id": "sg-04",
+      "name": "OpenAI: Написать сценарий",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const openaiResp = $input.first().json;\nconst meta = $('Code: Подготовить промпт').first().json;\n\nconst script = openaiResp.choices[0].message.content.trim();\nconst words = script.split(/\\s+/).length;\nconst estimatedSec = Math.round(words / 2.3);\n\nreturn [{\n  json: {\n    script,\n    avatar_name: meta.avatar_name,\n    topic: meta.topic,\n    language: meta.language,\n    word_count: words,\n    estimated_duration_sec: estimatedSec,\n    tokens_used: openaiResp.usage?.total_tokens || 0,\n    model: openaiResp.model\n  }\n}];"
+      },
+      "id": "sg-05",
+      "name": "Code: Результат",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Form: Параметры": {
+      "main": [[{ "node": "HTTP: Загрузка сайта", "type": "main", "index": 0 }]]
+    },
+    "HTTP: Загрузка сайта": {
+      "main": [[{ "node": "Code: Подготовить промпт", "type": "main", "index": 0 }]]
+    },
+    "Code: Подготовить промпт": {
+      "main": [[{ "node": "OpenAI: Написать сценарий", "type": "main", "index": 0 }]]
+    },
+    "OpenAI: Написать сценарий": {
+      "main": [[{ "node": "Code: Результат", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "id": "wf-01-script-generator"
+}

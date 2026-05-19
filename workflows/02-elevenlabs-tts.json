@@ -1,0 +1,153 @@
+{
+  "name": "02 – ElevenLabs TTS (тест голоса)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Генерация голоса — ElevenLabs",
+        "formDescription": "Тест голоса перед записью видео. Скачайте MP3 из результата.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Текст для озвучки",
+              "fieldType": "textarea",
+              "placeholder": "Привет! Я ваш AI-аватар. Сегодня расскажу...",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Voice ID",
+              "fieldType": "text",
+              "placeholder": "21m00Tcm4TlvDq8ikWAM",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Модель",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  { "option": "eleven_multilingual_v2" },
+                  { "option": "eleven_turbo_v2_5" },
+                  { "option": "eleven_flash_v2_5" }
+                ]
+              },
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Stability (0.0–1.0)",
+              "fieldType": "number",
+              "placeholder": "0.5",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Similarity boost (0.0–1.0)",
+              "fieldType": "number",
+              "placeholder": "0.75",
+              "requiredField": false
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "lastNode"
+            }
+          }
+        }
+      },
+      "id": "tts-01",
+      "name": "Form: Ввод текста",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [0, 300],
+      "webhookId": "ai-avatar-elevenlabs-tts"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const form = $input.first().json;\nreturn [{\n  json: {\n    text: form['Текст для озвучки'],\n    voice_id: form['Voice ID'],\n    model_id: form['Модель'] || 'eleven_multilingual_v2',\n    stability: parseFloat(form['Stability (0.0–1.0)']) || 0.5,\n    similarity_boost: parseFloat(form['Similarity boost (0.0–1.0)']) || 0.75\n  }\n}];"
+      },
+      "id": "tts-02",
+      "name": "Code: Параметры",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [280, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $json.voice_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xi-api-key",
+              "value": "={{ $vars.ELEVENLABS_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "audio/mpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"{{ $json.text }}\",\n  \"model_id\": \"{{ $json.model_id }}\",\n  \"voice_settings\": {\n    \"stability\": {{ $json.stability }},\n    \"similarity_boost\": {{ $json.similarity_boost }},\n    \"style\": 0.0,\n    \"use_speaker_boost\": true\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "tts-03",
+      "name": "ElevenLabs: TTS API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [560, 300]
+    },
+    {
+      "parameters": {
+        "fileName": "=avatar-voice-{{ $now.format('yyyyMMdd-HHmmss') }}.mp3"
+      },
+      "id": "tts-04",
+      "name": "Move: Переименовать файл",
+      "type": "n8n-nodes-base.moveBinaryData",
+      "typeVersion": 1,
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first();\nconst binary = item.binary?.data;\nconst form = $('Code: Параметры').first().json;\n\nreturn [{\n  json: {\n    status: 'success',\n    voice_id: form.voice_id,\n    model: form.model_id,\n    text_length: form.text.length,\n    file_size_bytes: binary?.fileSize || 0,\n    mime_type: binary?.mimeType || 'audio/mpeg',\n    filename: binary?.fileName || 'audio.mp3',\n    message: 'Аудио готово. Скачайте файл из вкладки Binary в этом узле или через Download.'\n  },\n  binary: item.binary\n}];"
+      },
+      "id": "tts-05",
+      "name": "Code: Результат",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Form: Ввод текста": {
+      "main": [[{ "node": "Code: Параметры", "type": "main", "index": 0 }]]
+    },
+    "Code: Параметры": {
+      "main": [[{ "node": "ElevenLabs: TTS API", "type": "main", "index": 0 }]]
+    },
+    "ElevenLabs: TTS API": {
+      "main": [[{ "node": "Move: Переименовать файл", "type": "main", "index": 0 }]]
+    },
+    "Move: Переименовать файл": {
+      "main": [[{ "node": "Code: Результат", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "id": "wf-02-elevenlabs-tts"
+}
