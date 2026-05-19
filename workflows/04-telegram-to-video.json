@@ -119,16 +119,15 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
+          "parameters": []
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 800,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"{{ $vars.AVATAR_SCRIPT_PROMPT || 'Ты — редактор сценариев для AI-видео аватаров. Полируй текст: убирай канцелярит, делай речь живой и разговорной, сохраняй смысл и факты. Только чистый текст для зачитывания — никаких ремарок, скобок, таймкодов, заголовков. Первое лицо, настоящее время.' }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Отполируй этот сценарий:\\n\\n{{ $('Code: Определить действие').first().json.payload.script }}\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 800,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Ты — редактор сценариев для AI-видео аватаров. Полируй текст: убирай канцелярит, делай речь живой и разговорной, сохраняй смысл и факты. Только чистый текст для зачитывания — никаких ремарок, скобок, таймкодов, заголовков. Первое лицо, настоящее время.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Отполируй этот сценарий:\\n\\n{{ $('Code: Определить действие').first().json.payload.script }}\"\n    }\n  ]\n}",
         "options": {}
       },
       "id": "tg-08",
@@ -142,16 +141,15 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
+          "parameters": []
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 800,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"{{ $vars.AVATAR_SCRIPT_PROMPT || 'Ты — редактор сценариев для AI-видео аватаров. Полируй текст: убирай канцелярит, делай речь живой и разговорной, сохраняй смысл и факты. Только чистый текст для зачитывания — никаких ремарок, скобок, таймкодов, заголовков. Первое лицо, настоящее время.' }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Вот текущий сценарий:\\n\\n{{ $('Code: Определить действие').first().json.payload.polishedScript }}\\n\\nПравки от автора: {{ $('Code: Определить действие').first().json.payload.feedback }}\\n\\nПереработай сценарий с учётом правок.\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 800,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Ты — редактор сценариев для AI-видео аватаров. Полируй текст: убирай канцелярит, делай речь живой и разговорной, сохраняй смысл и факты. Только чистый текст для зачитывания — никаких ремарок, скобок, таймкодов, заголовков. Первое лицо, настоящее время.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Вот текущий сценарий:\\n\\n{{ $('Code: Определить действие').first().json.payload.polishedScript }}\\n\\nПравки от автора: {{ $('Code: Определить действие').first().json.payload.feedback }}\\n\\nПереработай сценарий с учётом правок.\"\n    }\n  ]\n}",
         "options": {}
       },
       "id": "tg-09",
@@ -211,11 +209,11 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $vars.ELEVENLABS_VOICE_ID }}",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/YOUR_ELEVENLABS_VOICE_ID",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "xi-api-key", "value": "={{ $vars.ELEVENLABS_API_KEY }}" },
+            { "name": "xi-api-key", "value": "YOUR_ELEVENLABS_API_KEY" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
@@ -258,7 +256,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $vars.HEYGEN_API_KEY }}" },
+            { "name": "X-Api-Key", "value": "YOUR_HEYGEN_API_KEY" },
             { "name": "Content-Type", "value": "audio/mpeg" }
           ]
         },
@@ -302,7 +300,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $vars.HEYGEN_API_KEY }}" },
+            { "name": "X-Api-Key", "value": "YOUR_HEYGEN_API_KEY" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
@@ -313,7 +311,7 @@
             {
               "character": {
                 "type": "avatar",
-                "avatar_id": "={{ $vars.HEYGEN_AVATAR_ID }}",
+                "avatar_id": "YOUR_HEYGEN_AVATAR_ID",
                 "avatar_style": "normal"
               },
               "voice": {
@@ -358,7 +356,7 @@
         "url": "=https://api.heygen.com/v1/video_status.get?video_id={{ $json.videoId }}",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [{ "name": "X-Api-Key", "value": "={{ $vars.HEYGEN_API_KEY }}" }]
+          "parameters": [{ "name": "X-Api-Key", "value": "YOUR_HEYGEN_API_KEY" }]
         },
         "options": {}
       },
@@ -421,7 +419,7 @@
     {
       "parameters": {
         "operation": "append",
-        "documentId": { "__rl": true, "value": "={{ $vars.GOOGLE_SHEET_ID }}", "mode": "id" },
+        "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID", "mode": "id" },
         "sheetName": { "__rl": true, "value": "Видео", "mode": "name" },
         "columns": {
           "mappingMode": "defineBelow",
