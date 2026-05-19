@@ -419,7 +419,7 @@
     {
       "parameters": {
         "operation": "append",
-        "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID", "mode": "id" },
+        "documentId": { "__rl": true, "value": "1SiJswwQtx0z8Z28mrO1ui1AjAXZBIIoV6BZWJ_xEZ_c", "mode": "id" },
         "sheetName": { "__rl": true, "value": "Видео", "mode": "name" },
         "columns": {
           "mappingMode": "defineBelow",
