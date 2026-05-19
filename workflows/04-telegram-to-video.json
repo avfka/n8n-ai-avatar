@@ -1,0 +1,429 @@
+{
+  "name": "04 – Telegram Script → ElevenLabs → HeyGen Video",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "id": "tg-01",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 300],
+      "webhookId": "ai-avatar-telegram-trigger",
+      "notes": "Получает сообщение от вас. Требует Telegram Bot credential (токен от @BotFather)."
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $input.first().json.message;\n\nconst chatId = msg?.chat?.id;\nconst text = (msg?.text || '').trim();\nconst userId = msg?.from?.id;\n\n// Игнорируем команды и пустые сообщения\nif (!text || text.startsWith('/')) {\n  return [];\n}\n\nif (text.length < 20) {\n  throw new Error('Сценарий слишком короткий (минимум 20 символов)');\n}\n\nif (text.length > 2000) {\n  throw new Error('Сценарий слишком длинный (максимум 2000 символов). Отправьте: ' + text.length + '/2000');\n}\n\nconsole.log('Script received, length:', text.length, 'from chat:', chatId);\n\nreturn [{\n  json: {\n    script: text,\n    scriptLength: text.length,\n    chatId,\n    userId,\n    receivedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "tg-02",
+      "name": "Code: Извлечь сценарий",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "notes": "Валидирует текст: не команда, не пустой, 20–2000 символов."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "⏳ Сценарий получен ({{ $json.scriptLength }} символов). Генерирую аудио...",
+        "additionalFields": {}
+      },
+      "id": "tg-03",
+      "name": "Telegram: Статус — аудио",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [440, 300],
+      "notes": "Сразу отвечает пользователю чтобы он знал что процесс запущен."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $vars.ELEVENLABS_VOICE_ID }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xi-api-key",
+              "value": "={{ $vars.ELEVENLABS_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "text": "={{ $('Code: Извлечь сценарий').first().json.script }}",
+          "model_id": "eleven_multilingual_v2",
+          "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.8,
+            "style": 0.2,
+            "use_speaker_boost": true
+          }
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "tg-04",
+      "name": "ElevenLabs: Генерация аудио",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300],
+      "notes": "Генерирует MP3 из сценария. Переменные: ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "const audioData = $input.first().binary?.data;\nconst prev = $('Code: Извлечь сценарий').first().json;\n\nif (!audioData) {\n  throw new Error('ElevenLabs не вернул аудио');\n}\n\nconsole.log('Audio received, mime:', audioData.mimeType);\n\nreturn [{\n  json: {\n    ...prev,\n    audioMimeType: audioData.mimeType || 'audio/mpeg'\n  },\n  binary: {\n    data: audioData\n  }\n}];"
+      },
+      "id": "tg-05",
+      "name": "Code: Подготовить аудио",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300],
+      "notes": "Пробрасывает бинарные данные аудио и метаданные дальше."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://upload.heygen.com/v1/asset",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $vars.HEYGEN_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "audio/mpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "tg-06",
+      "name": "HeyGen: Загрузить аудио",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 300],
+      "notes": "Загружает MP3 в HeyGen. Возвращает audio_asset_id."
+    },
+    {
+      "parameters": {
+        "jsCode": "const uploadResp = $input.first().json;\nconst prev = $('Code: Извлечь сценарий').first().json;\n\nconst audioAssetId = uploadResp?.data?.id || uploadResp?.id;\n\nif (!audioAssetId) {\n  throw new Error('HeyGen не вернул audio_asset_id: ' + JSON.stringify(uploadResp));\n}\n\nconsole.log('Audio asset ID:', audioAssetId);\n\nreturn [{\n  json: {\n    ...prev,\n    audioAssetId\n  }\n}];"
+      },
+      "id": "tg-07",
+      "name": "Code: Извлечь asset ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 300],
+      "notes": "Достаёт audio_asset_id из ответа HeyGen."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "🎬 Аудио готово. Запускаю рендер видео в HeyGen...",
+        "additionalFields": {}
+      },
+      "id": "tg-08",
+      "name": "Telegram: Статус — рендер",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1540, 300],
+      "notes": "Промежуточный статус — аудио загружено, видео рендерится."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v2/video/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $vars.HEYGEN_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "video_inputs": [
+            {
+              "character": {
+                "type": "avatar",
+                "avatar_id": "={{ $vars.HEYGEN_AVATAR_ID }}",
+                "avatar_style": "normal"
+              },
+              "voice": {
+                "type": "audio",
+                "audio_asset_id": "={{ $json.audioAssetId }}"
+              },
+              "background": {
+                "type": "color",
+                "value": "#1a1a2e"
+              }
+            }
+          ],
+          "dimension": {
+            "width": 1080,
+            "height": 1920
+          },
+          "caption": false
+        },
+        "options": {}
+      },
+      "id": "tg-09",
+      "name": "HeyGen: Создать видео",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 300],
+      "notes": "Создаёт вертикальное 1080x1920 видео (Reels/Shorts). Переменная: HEYGEN_AVATAR_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst prev = $('Code: Извлечь сценарий').first().json;\n\nif (resp.error) throw new Error('HeyGen error: ' + JSON.stringify(resp.error));\n\nconst videoId = resp?.data?.video_id || resp?.video_id;\nif (!videoId) throw new Error('video_id не получен: ' + JSON.stringify(resp));\n\nconsole.log('Video ID:', videoId);\n\nreturn [{\n  json: {\n    ...prev,\n    videoId,\n    startedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "tg-10",
+      "name": "Code: Извлечь video ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 300],
+      "notes": "Достаёт video_id для поллинга."
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "tg-11",
+      "name": "Wait 30s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2200, 300],
+      "notes": "Первая пауза перед проверкой статуса."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.heygen.com/v1/video_status.get?video_id={{ $json.videoId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $vars.HEYGEN_API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "tg-12",
+      "name": "HeyGen: Проверить статус",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2420, 300],
+      "notes": "Опрашивает статус видео. Статусы: pending, processing, completed, failed."
+    },
+    {
+      "parameters": {
+        "jsCode": "const statusResp = $input.first().json;\nconst prev = $('Code: Извлечь video ID').first().json;\n\nconst status = statusResp?.data?.status || statusResp?.status;\nconst videoUrl = statusResp?.data?.video_url || statusResp?.video_url || null;\nconst thumbnailUrl = statusResp?.data?.thumbnail_url || null;\n\nconsole.log('Video status:', status);\n\nif (status === 'failed') {\n  throw new Error('HeyGen рендер завершился ошибкой: ' + JSON.stringify(statusResp));\n}\n\nreturn [{\n  json: {\n    ...prev,\n    status,\n    videoUrl,\n    thumbnailUrl,\n    checkedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "tg-13",
+      "name": "Code: Разобрать статус",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 300],
+      "notes": "Парсит статус. failed → бросает ошибку."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-done",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "tg-14",
+      "name": "IF: Готово?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2860, 300],
+      "notes": "completed → отправляем ссылку. иначе → ждём ещё 30с."
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "tg-15",
+      "name": "Wait 30s (retry)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3080, 500],
+      "notes": "Повторная пауза перед следующей проверкой."
+    },
+    {
+      "parameters": {
+        "jsCode": "const json = $input.first().json;\n\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);\nconst filename = `${timestamp}_avatar.mp4`;\n\nreturn [{\n  json: {\n    ...json,\n    filename,\n    savedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "tg-16",
+      "name": "Code: Подготовить имя файла",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3080, 160],
+      "notes": "Генерирует имя файла вида 2024-01-15T12-00-00_avatar.mp4"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Видео",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Дата": "={{ $json.savedAt }}",
+            "Сценарий": "={{ $json.script }}",
+            "Длина (символы)": "={{ $json.scriptLength }}",
+            "Video ID": "={{ $json.videoId }}",
+            "Video URL": "={{ $json.videoUrl }}",
+            "Файл": "={{ $json.filename }}",
+            "Статус": "completed"
+          }
+        },
+        "options": {}
+      },
+      "id": "tg-17",
+      "name": "Google Sheets: Логировать",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [3300, 160],
+      "notes": "Записывает строку в Google Sheets. Требует Google OAuth credential и переменную GOOGLE_SHEET_ID."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=✅ Видео готово!\n\n🎬 Смотреть / скачать:\n{{ $json.videoUrl }}\n\n📝 Сценарий: {{ $json.scriptLength }} символов\n🆔 Video ID: {{ $json.videoId }}",
+        "additionalFields": {}
+      },
+      "id": "tg-18",
+      "name": "Telegram: Отправить ссылку",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [3520, 160],
+      "notes": "Финальное сообщение — отправляет ссылку на готовое видео прямо в Telegram."
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [[{ "node": "Code: Извлечь сценарий", "type": "main", "index": 0 }]]
+    },
+    "Code: Извлечь сценарий": {
+      "main": [[{ "node": "Telegram: Статус — аудио", "type": "main", "index": 0 }]]
+    },
+    "Telegram: Статус — аудио": {
+      "main": [[{ "node": "ElevenLabs: Генерация аудио", "type": "main", "index": 0 }]]
+    },
+    "ElevenLabs: Генерация аудио": {
+      "main": [[{ "node": "Code: Подготовить аудио", "type": "main", "index": 0 }]]
+    },
+    "Code: Подготовить аудио": {
+      "main": [[{ "node": "HeyGen: Загрузить аудио", "type": "main", "index": 0 }]]
+    },
+    "HeyGen: Загрузить аудио": {
+      "main": [[{ "node": "Code: Извлечь asset ID", "type": "main", "index": 0 }]]
+    },
+    "Code: Извлечь asset ID": {
+      "main": [[{ "node": "Telegram: Статус — рендер", "type": "main", "index": 0 }]]
+    },
+    "Telegram: Статус — рендер": {
+      "main": [[{ "node": "HeyGen: Создать видео", "type": "main", "index": 0 }]]
+    },
+    "HeyGen: Создать видео": {
+      "main": [[{ "node": "Code: Извлечь video ID", "type": "main", "index": 0 }]]
+    },
+    "Code: Извлечь video ID": {
+      "main": [[{ "node": "Wait 30s", "type": "main", "index": 0 }]]
+    },
+    "Wait 30s": {
+      "main": [[{ "node": "HeyGen: Проверить статус", "type": "main", "index": 0 }]]
+    },
+    "HeyGen: Проверить статус": {
+      "main": [[{ "node": "Code: Разобрать статус", "type": "main", "index": 0 }]]
+    },
+    "Code: Разобрать статус": {
+      "main": [[{ "node": "IF: Готово?", "type": "main", "index": 0 }]]
+    },
+    "IF: Готово?": {
+      "main": [
+        [{ "node": "Code: Подготовить имя файла", "type": "main", "index": 0 }],
+        [{ "node": "Wait 30s (retry)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait 30s (retry)": {
+      "main": [[{ "node": "HeyGen: Проверить статус", "type": "main", "index": 0 }]]
+    },
+    "Code: Подготовить имя файла": {
+      "main": [[{ "node": "Google Sheets: Логировать", "type": "main", "index": 0 }]]
+    },
+    "Google Sheets: Логировать": {
+      "main": [[{ "node": "Telegram: Отправить ссылку", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  },
+  "pinData": {},
+  "versionId": "",
+  "triggerCount": 1,
+  "tags": []
+}
