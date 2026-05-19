@@ -1,5 +1,5 @@
 {
-  "name": "04 – Telegram Script → ElevenLabs → HeyGen Video",
+  "name": "04 – Telegram Script → GPT Polish → ElevenLabs → HeyGen Video",
   "nodes": [
     {
       "parameters": {
@@ -12,31 +12,201 @@
       "typeVersion": 1.1,
       "position": [0, 300],
       "webhookId": "ai-avatar-telegram-trigger",
-      "notes": "Получает сообщение от вас. Требует Telegram Bot credential (токен от @BotFather)."
+      "notes": "Получает любое сообщение. Токен бота — в Telegram API credential."
     },
     {
       "parameters": {
-        "jsCode": "const msg = $input.first().json.message;\n\nconst chatId = msg?.chat?.id;\nconst text = (msg?.text || '').trim();\nconst userId = msg?.from?.id;\n\n// Игнорируем команды и пустые сообщения\nif (!text || text.startsWith('/')) {\n  return [];\n}\n\nif (text.length < 20) {\n  throw new Error('Сценарий слишком короткий (минимум 20 символов)');\n}\n\nif (text.length > 2000) {\n  throw new Error('Сценарий слишком длинный (максимум 2000 символов). Отправьте: ' + text.length + '/2000');\n}\n\nconsole.log('Script received, length:', text.length, 'from chat:', chatId);\n\nreturn [{\n  json: {\n    script: text,\n    scriptLength: text.length,\n    chatId,\n    userId,\n    receivedAt: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const msg = $input.first().json.message;\nconst chatId = msg?.chat?.id?.toString();\nconst text = (msg?.text || '').trim();\nconst userId = msg?.from?.id?.toString();\n\nif (!chatId || !text) return [];\n\n// Читаем состояние из staticData\nconst state = $getWorkflowStaticData('global');\nconst userState = state[chatId] || { step: 'idle' };\n\nlet action = 'unknown';\nlet payload = {};\n\nif (text === '/start') {\n  action = 'start';\n} else if (text === '/cancel') {\n  action = 'cancel';\n} else if (userState.step === 'idle') {\n  // Новый черновик сценария\n  if (text.length < 20) {\n    action = 'too_short';\n  } else if (text.length > 2000) {\n    action = 'too_long';\n    payload.length = text.length;\n  } else {\n    action = 'new_script';\n    payload.script = text;\n  }\n} else if (userState.step === 'waiting_approval') {\n  const lower = text.toLowerCase();\n  if (lower === 'ок' || lower === 'ok' || lower === 'да' || lower === 'го' || lower === '👍') {\n    action = 'approved';\n    payload.polishedScript = userState.polishedScript;\n  } else {\n    // Пользователь прислал правки\n    action = 'revision';\n    payload.originalScript = userState.originalScript;\n    payload.polishedScript = userState.polishedScript;\n    payload.feedback = text;\n  }\n} else {\n  action = 'unexpected';\n}\n\nreturn [{\n  json: {\n    action,\n    chatId,\n    userId,\n    text,\n    payload,\n    userState\n  }\n}];"
       },
       "id": "tg-02",
-      "name": "Code: Извлечь сценарий",
+      "name": "Code: Определить действие",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [220, 300],
-      "notes": "Валидирует текст: не команда, не пустой, 20–2000 символов."
+      "notes": "Читает состояние пользователя из staticData. Определяет что делать: новый сценарий, одобрение, правки, команда."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "new_script",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "tg-03",
+      "name": "IF: Новый сценарий?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "approved",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "tg-04",
+      "name": "IF: Одобрено?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 560]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "c3",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "revision",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "tg-05",
+      "name": "IF: Правки?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 820]
     },
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "⏳ Сценарий получен ({{ $json.scriptLength }} символов). Генерирую аудио...",
+        "text": "=👋 Привет! Отправьте мне черновик сценария для аватара.\n\nЯ его отполирую через GPT и покажу вам — вы сможете одобрить или попросить правки.\n\nОграничения: 20–2000 символов.",
         "additionalFields": {}
       },
-      "id": "tg-03",
+      "id": "tg-06",
+      "name": "Telegram: /start",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [660, 1060]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "✏️ Полирую ваш сценарий через GPT...",
+        "additionalFields": {}
+      },
+      "id": "tg-07",
+      "name": "Telegram: Статус — полировка",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 800,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"{{ $vars.AVATAR_SCRIPT_PROMPT || 'Ты — редактор сценариев для AI-видео аватаров. Полируй текст: убирай канцелярит, делай речь живой и разговорной, сохраняй смысл и факты. Только чистый текст для зачитывания — никаких ремарок, скобок, таймкодов, заголовков. Первое лицо, настоящее время.' }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Отполируй этот сценарий:\\n\\n{{ $('Code: Определить действие').first().json.payload.script }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "tg-08",
+      "name": "GPT: Полировка сценария",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 300],
+      "notes": "Промпт можно переопределить через переменную AVATAR_SCRIPT_PROMPT в Settings → Variables."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 800,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"{{ $vars.AVATAR_SCRIPT_PROMPT || 'Ты — редактор сценариев для AI-видео аватаров. Полируй текст: убирай канцелярит, делай речь живой и разговорной, сохраняй смысл и факты. Только чистый текст для зачитывания — никаких ремарок, скобок, таймкодов, заголовков. Первое лицо, настоящее время.' }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Вот текущий сценарий:\\n\\n{{ $('Code: Определить действие').first().json.payload.polishedScript }}\\n\\nПравки от автора: {{ $('Code: Определить действие').first().json.payload.feedback }}\\n\\nПереработай сценарий с учётом правок.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "tg-09",
+      "name": "GPT: Применить правки",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 820]
+    },
+    {
+      "parameters": {
+        "jsCode": "const gptResp = $input.first().json;\nconst prev = $('Code: Определить действие').first().json;\n\nconst polished = gptResp.choices[0].message.content.trim();\nif (!polished || polished.length < 20) throw new Error('GPT вернул пустой результат');\n\n// Сохраняем состояние\nconst state = $getWorkflowStaticData('global');\nstate[prev.chatId] = {\n  step: 'waiting_approval',\n  originalScript: prev.payload.script || prev.userState?.originalScript,\n  polishedScript: polished\n};\n\nreturn [{\n  json: {\n    chatId: prev.chatId,\n    polished,\n    originalScript: prev.payload.script || prev.userState?.originalScript\n  }\n}];"
+      },
+      "id": "tg-10",
+      "name": "Code: Сохранить черновик",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 560],
+      "notes": "Сохраняет отполированный сценарий в staticData и переводит пользователя в состояние waiting_approval."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=✅ Готово! Вот отполированный сценарий:\n\n──────────────\n{{ $json.polished }}\n──────────────\n\nОтправьте *ок* чтобы запустить рендер видео.\nИли напишите правки — я переделаю.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-11",
+      "name": "Telegram: Показать сценарий",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1320, 560]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Code: Определить действие').first().json;\nconst script = prev.payload.polishedScript;\nconst chatId = prev.chatId;\n\n// Сбрасываем состояние — процесс запущен\nconst state = $getWorkflowStaticData('global');\nstate[chatId] = { step: 'idle' };\n\nreturn [{\n  json: { script, chatId, scriptLength: script.length, receivedAt: new Date().toISOString() }\n}];"
+      },
+      "id": "tg-12",
+      "name": "Code: Запустить рендер",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 560],
+      "notes": "Берёт одобренный сценарий, сбрасывает состояние пользователя, передаёт дальше на рендер."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "⏳ Сценарий одобрен! Генерирую аудио через ElevenLabs...",
+        "additionalFields": {}
+      },
+      "id": "tg-13",
       "name": "Telegram: Статус — аудио",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [440, 300],
-      "notes": "Сразу отвечает пользователю чтобы он знал что процесс запущен."
+      "position": [880, 560]
     },
     {
       "parameters": {
@@ -45,20 +215,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "xi-api-key",
-              "value": "={{ $vars.ELEVENLABS_API_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
+            { "name": "xi-api-key", "value": "={{ $vars.ELEVENLABS_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "contentType": "json",
         "body": {
-          "text": "={{ $('Code: Извлечь сценарий').first().json.script }}",
+          "text": "={{ $('Code: Запустить рендер').first().json.script }}",
           "model_id": "eleven_multilingual_v2",
           "voice_settings": {
             "stability": 0.5,
@@ -68,30 +232,24 @@
           }
         },
         "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
-            }
-          }
+          "response": { "response": { "responseFormat": "file" } }
         }
       },
-      "id": "tg-04",
+      "id": "tg-14",
       "name": "ElevenLabs: Генерация аудио",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 300],
-      "notes": "Генерирует MP3 из сценария. Переменные: ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID."
+      "position": [1100, 560]
     },
     {
       "parameters": {
-        "jsCode": "const audioData = $input.first().binary?.data;\nconst prev = $('Code: Извлечь сценарий').first().json;\n\nif (!audioData) {\n  throw new Error('ElevenLabs не вернул аудио');\n}\n\nconsole.log('Audio received, mime:', audioData.mimeType);\n\nreturn [{\n  json: {\n    ...prev,\n    audioMimeType: audioData.mimeType || 'audio/mpeg'\n  },\n  binary: {\n    data: audioData\n  }\n}];"
+        "jsCode": "const audioData = $input.first().binary?.data;\nconst prev = $('Code: Запустить рендер').first().json;\nif (!audioData) throw new Error('ElevenLabs не вернул аудио');\nreturn [{ json: { ...prev, audioMimeType: audioData.mimeType || 'audio/mpeg' }, binary: { data: audioData } }];"
       },
-      "id": "tg-05",
+      "id": "tg-15",
       "name": "Code: Подготовить аудио",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 300],
-      "notes": "Пробрасывает бинарные данные аудио и метаданные дальше."
+      "position": [1320, 560]
     },
     {
       "parameters": {
@@ -100,14 +258,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "X-Api-Key",
-              "value": "={{ $vars.HEYGEN_API_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "audio/mpeg"
-            }
+            { "name": "X-Api-Key", "value": "={{ $vars.HEYGEN_API_KEY }}" },
+            { "name": "Content-Type", "value": "audio/mpeg" }
           ]
         },
         "sendBody": true,
@@ -115,23 +267,21 @@
         "inputDataFieldName": "data",
         "options": {}
       },
-      "id": "tg-06",
+      "id": "tg-16",
       "name": "HeyGen: Загрузить аудио",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, 300],
-      "notes": "Загружает MP3 в HeyGen. Возвращает audio_asset_id."
+      "position": [1540, 560]
     },
     {
       "parameters": {
-        "jsCode": "const uploadResp = $input.first().json;\nconst prev = $('Code: Извлечь сценарий').first().json;\n\nconst audioAssetId = uploadResp?.data?.id || uploadResp?.id;\n\nif (!audioAssetId) {\n  throw new Error('HeyGen не вернул audio_asset_id: ' + JSON.stringify(uploadResp));\n}\n\nconsole.log('Audio asset ID:', audioAssetId);\n\nreturn [{\n  json: {\n    ...prev,\n    audioAssetId\n  }\n}];"
+        "jsCode": "const uploadResp = $input.first().json;\nconst prev = $('Code: Запустить рендер').first().json;\nconst audioAssetId = uploadResp?.data?.id || uploadResp?.id;\nif (!audioAssetId) throw new Error('HeyGen не вернул audio_asset_id: ' + JSON.stringify(uploadResp));\nreturn [{ json: { ...prev, audioAssetId } }];"
       },
-      "id": "tg-07",
+      "id": "tg-17",
       "name": "Code: Извлечь asset ID",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, 300],
-      "notes": "Достаёт audio_asset_id из ответа HeyGen."
+      "position": [1760, 560]
     },
     {
       "parameters": {
@@ -139,12 +289,11 @@
         "text": "🎬 Аудио готово. Запускаю рендер видео в HeyGen...",
         "additionalFields": {}
       },
-      "id": "tg-08",
+      "id": "tg-18",
       "name": "Telegram: Статус — рендер",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1540, 300],
-      "notes": "Промежуточный статус — аудио загружено, видео рендерится."
+      "position": [1980, 560]
     },
     {
       "parameters": {
@@ -153,14 +302,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "X-Api-Key",
-              "value": "={{ $vars.HEYGEN_API_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
+            { "name": "X-Api-Key", "value": "={{ $vars.HEYGEN_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
@@ -177,49 +320,37 @@
                 "type": "audio",
                 "audio_asset_id": "={{ $json.audioAssetId }}"
               },
-              "background": {
-                "type": "color",
-                "value": "#1a1a2e"
-              }
+              "background": { "type": "color", "value": "#1a1a2e" }
             }
           ],
-          "dimension": {
-            "width": 1080,
-            "height": 1920
-          },
+          "dimension": { "width": 1080, "height": 1920 },
           "caption": false
         },
         "options": {}
       },
-      "id": "tg-09",
+      "id": "tg-19",
       "name": "HeyGen: Создать видео",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1760, 300],
-      "notes": "Создаёт вертикальное 1080x1920 видео (Reels/Shorts). Переменная: HEYGEN_AVATAR_ID."
+      "position": [2200, 560]
     },
     {
       "parameters": {
-        "jsCode": "const resp = $input.first().json;\nconst prev = $('Code: Извлечь сценарий').first().json;\n\nif (resp.error) throw new Error('HeyGen error: ' + JSON.stringify(resp.error));\n\nconst videoId = resp?.data?.video_id || resp?.video_id;\nif (!videoId) throw new Error('video_id не получен: ' + JSON.stringify(resp));\n\nconsole.log('Video ID:', videoId);\n\nreturn [{\n  json: {\n    ...prev,\n    videoId,\n    startedAt: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const resp = $input.first().json;\nconst prev = $('Code: Запустить рендер').first().json;\nif (resp.error) throw new Error('HeyGen error: ' + JSON.stringify(resp.error));\nconst videoId = resp?.data?.video_id || resp?.video_id;\nif (!videoId) throw new Error('video_id не получен: ' + JSON.stringify(resp));\nreturn [{ json: { ...prev, videoId, startedAt: new Date().toISOString() } }];"
       },
-      "id": "tg-10",
+      "id": "tg-20",
       "name": "Code: Извлечь video ID",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1980, 300],
-      "notes": "Достаёт video_id для поллинга."
+      "position": [2420, 560]
     },
     {
-      "parameters": {
-        "amount": 30,
-        "unit": "seconds"
-      },
-      "id": "tg-11",
+      "parameters": { "amount": 30, "unit": "seconds" },
+      "id": "tg-21",
       "name": "Wait 30s",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [2200, 300],
-      "notes": "Первая пауза перед проверкой статуса."
+      "position": [2640, 560]
     },
     {
       "parameters": {
@@ -227,99 +358,71 @@
         "url": "=https://api.heygen.com/v1/video_status.get?video_id={{ $json.videoId }}",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-Api-Key",
-              "value": "={{ $vars.HEYGEN_API_KEY }}"
-            }
-          ]
+          "parameters": [{ "name": "X-Api-Key", "value": "={{ $vars.HEYGEN_API_KEY }}" }]
         },
         "options": {}
       },
-      "id": "tg-12",
+      "id": "tg-22",
       "name": "HeyGen: Проверить статус",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2420, 300],
-      "notes": "Опрашивает статус видео. Статусы: pending, processing, completed, failed."
+      "position": [2860, 560]
     },
     {
       "parameters": {
-        "jsCode": "const statusResp = $input.first().json;\nconst prev = $('Code: Извлечь video ID').first().json;\n\nconst status = statusResp?.data?.status || statusResp?.status;\nconst videoUrl = statusResp?.data?.video_url || statusResp?.video_url || null;\nconst thumbnailUrl = statusResp?.data?.thumbnail_url || null;\n\nconsole.log('Video status:', status);\n\nif (status === 'failed') {\n  throw new Error('HeyGen рендер завершился ошибкой: ' + JSON.stringify(statusResp));\n}\n\nreturn [{\n  json: {\n    ...prev,\n    status,\n    videoUrl,\n    thumbnailUrl,\n    checkedAt: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const statusResp = $input.first().json;\nconst prev = $('Code: Извлечь video ID').first().json;\nconst status = statusResp?.data?.status || statusResp?.status;\nconst videoUrl = statusResp?.data?.video_url || statusResp?.video_url || null;\nconst thumbnailUrl = statusResp?.data?.thumbnail_url || null;\nif (status === 'failed') throw new Error('HeyGen рендер завершился ошибкой: ' + JSON.stringify(statusResp));\nreturn [{ json: { ...prev, status, videoUrl, thumbnailUrl, checkedAt: new Date().toISOString() } }];"
       },
-      "id": "tg-13",
+      "id": "tg-23",
       "name": "Code: Разобрать статус",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2640, 300],
-      "notes": "Парсит статус. failed → бросает ошибку."
+      "position": [3080, 560]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
           "conditions": [
             {
               "id": "cond-done",
               "leftValue": "={{ $json.status }}",
               "rightValue": "completed",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
+              "operator": { "type": "string", "operation": "equals" }
             }
           ],
           "combinator": "and"
         },
         "options": {}
       },
-      "id": "tg-14",
+      "id": "tg-24",
       "name": "IF: Готово?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2860, 300],
-      "notes": "completed → отправляем ссылку. иначе → ждём ещё 30с."
+      "position": [3300, 560]
     },
     {
-      "parameters": {
-        "amount": 30,
-        "unit": "seconds"
-      },
-      "id": "tg-15",
+      "parameters": { "amount": 30, "unit": "seconds" },
+      "id": "tg-25",
       "name": "Wait 30s (retry)",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [3080, 500],
-      "notes": "Повторная пауза перед следующей проверкой."
+      "position": [3520, 760]
     },
     {
       "parameters": {
-        "jsCode": "const json = $input.first().json;\n\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);\nconst filename = `${timestamp}_avatar.mp4`;\n\nreturn [{\n  json: {\n    ...json,\n    filename,\n    savedAt: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const json = $input.first().json;\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);\nconst filename = `${timestamp}_avatar.mp4`;\nreturn [{ json: { ...json, filename, savedAt: new Date().toISOString() } }];"
       },
-      "id": "tg-16",
+      "id": "tg-26",
       "name": "Code: Подготовить имя файла",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3080, 160],
-      "notes": "Генерирует имя файла вида 2024-01-15T12-00-00_avatar.mp4"
+      "position": [3520, 420]
     },
     {
       "parameters": {
         "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "={{ $vars.GOOGLE_SHEET_ID }}",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Видео",
-          "mode": "name"
-        },
+        "documentId": { "__rl": true, "value": "={{ $vars.GOOGLE_SHEET_ID }}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Видео", "mode": "name" },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
@@ -334,32 +437,63 @@
         },
         "options": {}
       },
-      "id": "tg-17",
+      "id": "tg-27",
       "name": "Google Sheets: Логировать",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [3300, 160],
-      "notes": "Записывает строку в Google Sheets. Требует Google OAuth credential и переменную GOOGLE_SHEET_ID."
+      "position": [3740, 420]
     },
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "=✅ Видео готово!\n\n🎬 Смотреть / скачать:\n{{ $json.videoUrl }}\n\n📝 Сценарий: {{ $json.scriptLength }} символов\n🆔 Video ID: {{ $json.videoId }}",
+        "text": "=✅ Видео готово!\n\n🎬 Смотреть / скачать:\n{{ $json.videoUrl }}\n\n📝 Символов в сценарии: {{ $json.scriptLength }}\n🆔 Video ID: {{ $json.videoId }}",
         "additionalFields": {}
       },
-      "id": "tg-18",
+      "id": "tg-28",
       "name": "Telegram: Отправить ссылку",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [3520, 160],
-      "notes": "Финальное сообщение — отправляет ссылку на готовое видео прямо в Telegram."
+      "position": [3960, 420]
     }
   ],
   "connections": {
     "Telegram Trigger": {
-      "main": [[{ "node": "Code: Извлечь сценарий", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Code: Определить действие", "type": "main", "index": 0 }]]
     },
-    "Code: Извлечь сценарий": {
+    "Code: Определить действие": {
+      "main": [[{ "node": "IF: Новый сценарий?", "type": "main", "index": 0 }]]
+    },
+    "IF: Новый сценарий?": {
+      "main": [
+        [{ "node": "Telegram: Статус — полировка", "type": "main", "index": 0 }],
+        [{ "node": "IF: Одобрено?", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF: Одобрено?": {
+      "main": [
+        [{ "node": "Code: Запустить рендер", "type": "main", "index": 0 }],
+        [{ "node": "IF: Правки?", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF: Правки?": {
+      "main": [
+        [{ "node": "GPT: Применить правки", "type": "main", "index": 0 }],
+        [{ "node": "Telegram: /start", "type": "main", "index": 0 }]
+      ]
+    },
+    "Telegram: Статус — полировка": {
+      "main": [[{ "node": "GPT: Полировка сценария", "type": "main", "index": 0 }]]
+    },
+    "GPT: Полировка сценария": {
+      "main": [[{ "node": "Code: Сохранить черновик", "type": "main", "index": 0 }]]
+    },
+    "GPT: Применить правки": {
+      "main": [[{ "node": "Code: Сохранить черновик", "type": "main", "index": 0 }]]
+    },
+    "Code: Сохранить черновик": {
+      "main": [[{ "node": "Telegram: Показать сценарий", "type": "main", "index": 0 }]]
+    },
+    "Code: Запустить рендер": {
       "main": [[{ "node": "Telegram: Статус — аудио", "type": "main", "index": 0 }]]
     },
     "Telegram: Статус — аудио": {
@@ -418,10 +552,7 @@
     "errorWorkflow": ""
   },
   "staticData": null,
-  "meta": {
-    "templateCredsSetupCompleted": false,
-    "instanceId": ""
-  },
+  "meta": { "templateCredsSetupCompleted": false, "instanceId": "" },
   "pinData": {},
   "versionId": "",
   "triggerCount": 1,
