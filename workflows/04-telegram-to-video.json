@@ -94,7 +94,7 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "=👋 Привет! Отправьте мне черновик сценария для аватара.\n\nЯ его отполирую через GPT и покажу вам — вы сможете одобрить или попросить правки.\n\nОграничения: 20–2000 символов.",
+        "text": "={{ $json.action === 'too_short' ? '❌ Сценарий слишком короткий. Минимум 20 символов — отправьте более длинный текст.' : $json.action === 'too_long' ? '❌ Сценарий слишком длинный (у вас ' + ($json.payload?.length || '') + ' симв., максимум 2000). Сократите текст.' : '👋 Привет! Отправьте мне черновик сценария для аватара.\\n\\nЯ его отполирую через GPT и покажу вам — вы сможете одобрить или попросить правки.\\n\\nОграничения: 20–2000 символов.' }}",
         "additionalFields": {}
       },
       "id": "tg-06",
@@ -368,7 +368,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const statusResp = $input.first().json;\nconst prev = $('Code: Извлечь video ID').first().json;\nconst status = statusResp?.data?.status || statusResp?.status;\nconst videoUrl = statusResp?.data?.video_url || statusResp?.video_url || null;\nconst thumbnailUrl = statusResp?.data?.thumbnail_url || null;\nif (status === 'failed') throw new Error('HeyGen рендер завершился ошибкой: ' + JSON.stringify(statusResp));\nreturn [{ json: { ...prev, status, videoUrl, thumbnailUrl, checkedAt: new Date().toISOString() } }];"
+        "jsCode": "const statusResp = $input.first().json;\nconst prev = $('Code: Извлечь video ID').first().json;\nconst pollCount = ($input.first().json.pollCount || 0) + 1;\nconst status = statusResp?.data?.status || statusResp?.status;\nconst videoUrl = statusResp?.data?.video_url || statusResp?.video_url || null;\nconst thumbnailUrl = statusResp?.data?.thumbnail_url || null;\nif (status === 'failed') throw new Error('HeyGen рендер завершился ошибкой: ' + JSON.stringify(statusResp));\nif (pollCount > 24) throw new Error(`HeyGen не завершил рендер за 12 минут (${pollCount} попыток). Проверьте видео вручную: ${prev.videoId}`);\nreturn [{ json: { ...prev, status, videoUrl, thumbnailUrl, checkedAt: new Date().toISOString(), pollCount } }];"
       },
       "id": "tg-23",
       "name": "Code: Разобрать статус",
