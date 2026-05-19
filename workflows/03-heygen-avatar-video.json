@@ -20,6 +20,12 @@
               "requiredField": true
             },
             {
+              "fieldLabel": "Тема / название",
+              "fieldType": "text",
+              "placeholder": "Excel курс — урок 1",
+              "requiredField": false
+            },
+            {
               "fieldLabel": "Voice ID (HeyGen)",
               "fieldType": "text",
               "placeholder": "получить из HeyGen → Voices",
@@ -74,7 +80,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const form = $input.first().json;\n\nconst formatMap = {\n  '16:9 (1280×720)': { width: 1280, height: 720, ratio: '16:9' },\n  '9:16 (720×1280)': { width: 720, height: 1280, ratio: '9:16' },\n  '1:1 (720×720)':   { width: 720, height: 720,  ratio: '1:1' }\n};\nconst dim = formatMap[form['Формат']] || formatMap['16:9 (1280×720)'];\n\nconst audioUrl = (form['Audio URL (если есть готовый MP3)'] || '').trim();\nconst voiceId  = (form['Voice ID (HeyGen)'] || '').trim();\nconst isTest   = form['Тестовый режим (test=true, бесплатно)'] !== 'Нет — продакшн';\n\nlet voiceInput;\nif (audioUrl) {\n  voiceInput = { type: 'audio', audio_url: audioUrl };\n} else if (voiceId) {\n  voiceInput = { type: 'text', input_text: form['Сценарий (текст)'], voice_id: voiceId, speed: 1.0 };\n} else {\n  throw new Error('Укажите Voice ID или Audio URL');\n}\n\nconst requestBody = {\n  video_inputs: [\n    {\n      character: {\n        type: 'avatar',\n        avatar_id: form['Avatar ID'],\n        avatar_style: 'normal'\n      },\n      voice: voiceInput,\n      background: {\n        type: 'color',\n        value: '#ffffff'\n      }\n    }\n  ],\n  dimension: { width: dim.width, height: dim.height },\n  aspect_ratio: dim.ratio,\n  test: isTest\n};\n\nreturn [{\n  json: {\n    request_body: requestBody,\n    script_text: form['Сценарий (текст)'],\n    avatar_id: form['Avatar ID'],\n    is_test: isTest,\n    dimension: dim\n  }\n}];"
+        "jsCode": "const form = $input.first().json;\n\nconst formatMap = {\n  '16:9 (1280×720)': { width: 1280, height: 720, ratio: '16:9' },\n  '9:16 (720×1280)': { width: 720, height: 1280, ratio: '9:16' },\n  '1:1 (720×720)':   { width: 720, height: 720,  ratio: '1:1' }\n};\nconst dim = formatMap[form['Формат']] || formatMap['16:9 (1280×720)'];\n\nconst audioUrl = (form['Audio URL (если есть готовый MP3)'] || '').trim();\nconst voiceId  = (form['Voice ID (HeyGen)'] || '').trim();\nconst isTest   = form['Тестовый режим (test=true, бесплатно)'] !== 'Нет — продакшн';\n\nlet voiceInput;\nif (audioUrl) {\n  voiceInput = { type: 'audio', audio_url: audioUrl };\n} else if (voiceId) {\n  voiceInput = { type: 'text', input_text: form['Сценарий (текст)'], voice_id: voiceId, speed: 1.0 };\n} else {\n  throw new Error('Укажите Voice ID или Audio URL');\n}\n\nconst requestBody = {\n  video_inputs: [\n    {\n      character: {\n        type: 'avatar',\n        avatar_id: form['Avatar ID'],\n        avatar_style: 'normal'\n      },\n      voice: voiceInput,\n      background: {\n        type: 'color',\n        value: '#ffffff'\n      }\n    }\n  ],\n  dimension: { width: dim.width, height: dim.height },\n  aspect_ratio: dim.ratio,\n  test: isTest\n};\n\nreturn [{\n  json: {\n    request_body: requestBody,\n    script_text: form['Сценарий (текст)'],\n    topic: form['Тема / название'] || '',\n    avatar_id: form['Avatar ID'],\n    is_test: isTest,\n    dimension: dim\n  }\n}];"
       },
       "id": "hg-02",
       "name": "Code: Собрать запрос",
@@ -113,7 +119,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Poll HeyGen until video is ready (max 20 min)\nconst resp = $input.first().json;\nif (resp.error) throw new Error('HeyGen error: ' + JSON.stringify(resp.error));\n\nconst videoId = resp.data?.video_id;\nif (!videoId) throw new Error('video_id не получен: ' + JSON.stringify(resp));\n\nconst apiKey = $vars.HEYGEN_API_KEY;\nconst maxAttempts = 24;   // 24 × 30s = 12 min\nconst interval = 30000;   // 30 seconds\n\nasync function sleep(ms) {\n  return new Promise(resolve => setTimeout(resolve, ms));\n}\n\nlet status = 'pending';\nlet result = {};\n\nfor (let i = 0; i < maxAttempts; i++) {\n  await sleep(interval);\n\n  const res = await fetch(\n    `https://api.heygen.com/v1/video_status.get?video_id=${videoId}`,\n    { headers: { 'X-Api-Key': apiKey } }\n  );\n  const body = await res.json();\n  result = body.data || {};\n  status = result.status || 'unknown';\n\n  if (status === 'completed' || status === 'failed') break;\n}\n\nreturn [{\n  json: {\n    video_id: videoId,\n    status,\n    video_url: result.video_url || null,\n    thumbnail_url: result.thumbnail_url || null,\n    duration_sec: result.duration || null,\n    error: result.error || null\n  }\n}];"
+        "jsCode": "// Poll HeyGen with exponential backoff until video is ready (max ~15 min)\nconst resp = $input.first().json;\nif (resp.error) throw new Error('HeyGen error: ' + JSON.stringify(resp.error));\n\nconst videoId = resp.data?.video_id;\nif (!videoId) throw new Error('video_id не получен: ' + JSON.stringify(resp));\n\nconst apiKey = $vars.HEYGEN_API_KEY;\n\nasync function sleep(ms) {\n  return new Promise(resolve => setTimeout(resolve, ms));\n}\n\nconst delays = [10000, 15000, 20000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000];\n\nlet status = 'pending';\nlet result = {};\n\nfor (let i = 0; i < delays.length; i++) {\n  await sleep(delays[i]);\n\n  const res = await fetch(\n    `https://api.heygen.com/v1/video_status.get?video_id=${videoId}`,\n    { headers: { 'X-Api-Key': apiKey } }\n  );\n  const body = await res.json();\n  result = body.data || {};\n  status = result.status || 'unknown';\n\n  if (status === 'completed' || status === 'failed') break;\n}\n\nreturn [{\n  json: {\n    video_id: videoId,\n    status,\n    video_url: result.video_url || null,\n    thumbnail_url: result.thumbnail_url || null,\n    duration_sec: result.duration || null,\n    error: result.error || null\n  }\n}];"
       },
       "id": "hg-04",
       "name": "Code: Ждать готовности",
@@ -187,6 +193,30 @@
             },
             {
               "id": "out-6",
+              "name": "topic",
+              "value": "={{ $('Code: Собрать запрос').first().json.topic }}",
+              "type": "string"
+            },
+            {
+              "id": "out-7",
+              "name": "avatar_id",
+              "value": "={{ $('Code: Собрать запрос').first().json.avatar_id }}",
+              "type": "string"
+            },
+            {
+              "id": "out-8",
+              "name": "script_text",
+              "value": "={{ $('Code: Собрать запрос').first().json.script_text }}",
+              "type": "string"
+            },
+            {
+              "id": "out-9",
+              "name": "is_test",
+              "value": "={{ $('Code: Собрать запрос').first().json.is_test }}",
+              "type": "boolean"
+            },
+            {
+              "id": "out-10",
               "name": "message",
               "value": "Видео готово! Скачайте по ссылке video_url.",
               "type": "string"
@@ -200,6 +230,53 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [1400, 160]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Видео",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Дата": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+            "Тема": "={{ $json.topic }}",
+            "Аватар ID": "={{ $json.avatar_id }}",
+            "Сценарий": "={{ $json.script_text }}",
+            "Video URL": "={{ $json.video_url }}",
+            "Thumbnail URL": "={{ $json.thumbnail_url }}",
+            "Video ID": "={{ $json.video_id }}",
+            "Длительность (сек)": "={{ $json.duration_sec }}",
+            "Тест": "={{ $json.is_test ? 'Да' : 'Нет' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Дата", "displayName": "Дата", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string" },
+            { "id": "Тема", "displayName": "Тема", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string" },
+            { "id": "Аватар ID", "displayName": "Аватар ID", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string" },
+            { "id": "Сценарий", "displayName": "Сценарий", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string" },
+            { "id": "Video URL", "displayName": "Video URL", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string" },
+            { "id": "Thumbnail URL", "displayName": "Thumbnail URL", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string" },
+            { "id": "Video ID", "displayName": "Video ID", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string" },
+            { "id": "Длительность (сек)", "displayName": "Длительность (сек)", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "number" },
+            { "id": "Тест", "displayName": "Тест", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "hg-08",
+      "name": "Google Sheets: Сохранить",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1680, 160]
     },
     {
       "parameters": {
@@ -265,6 +342,9 @@
         [{ "node": "Set: Готово — ссылка на видео", "type": "main", "index": 0 }],
         [{ "node": "Set: Ошибка", "type": "main", "index": 0 }]
       ]
+    },
+    "Set: Готово — ссылка на видео": {
+      "main": [[{ "node": "Google Sheets: Сохранить", "type": "main", "index": 0 }]]
     }
   },
   "active": false,
