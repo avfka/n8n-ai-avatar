@@ -31,6 +31,46 @@
           "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
           "conditions": [
             {
+              "id": "c-start",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "start",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "c-cancel",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "cancel",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "tg-30",
+      "name": "IF: Старт?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 80]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "👋 Привет! Отправьте мне черновик сценария для аватара.\n\nЯ его отполирую через GPT и покажу вам — вы сможете одобрить или попросить правки.\n\nОграничения: 20–2000 символов.",
+        "additionalFields": {}
+      },
+      "id": "tg-31",
+      "name": "Telegram: Добро пожаловать",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [660, 80]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
               "id": "c1",
               "leftValue": "={{ $json.action }}",
               "rightValue": "new_script",
@@ -94,7 +134,7 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "={{ $json.action === 'too_short' ? '❌ Сценарий слишком короткий. Минимум 20 символов — отправьте более длинный текст.' : $json.action === 'too_long' ? '❌ Сценарий слишком длинный (у вас ' + ($json.payload?.length || '') + ' симв., максимум 2000). Сократите текст.' : $json.action === 'want_new' ? '📝 Отлично! Отправьте новый сценарий — я готов к работе.' : $json.action === 'no_new' ? '👌 Хорошо, буду ждать! Когда захотите снова — просто напишите /start' : $json.action === 'unexpected_new_video' ? '❓ Не понял ответ. Напишите Да чтобы создать новое видео или Нет чтобы завершить.' : ['👋 Привет! Отправьте мне черновик сценария для аватара.', '', 'Я его отполирую через GPT и покажу вам — вы сможете одобрить или попросить правки.', '', 'Ограничения: 20–2000 символов.'].join('\n') }}",
+        "text": "={{ $json.action === 'too_short' ? '❌ Сценарий слишком короткий. Минимум 20 символов — отправьте более длинный текст.' : $json.action === 'too_long' ? '❌ Сценарий слишком длинный (у вас ' + ($json.payload?.length || '') + ' симв., максимум 2000). Сократите текст.' : $json.action === 'want_new' ? '📝 Отлично! Отправьте новый сценарий — я готов к работе.' : $json.action === 'no_new' ? '👌 Хорошо, буду ждать! Когда захотите снова — просто напишите /start' : $json.action === 'unexpected_new_video' ? '❓ Не понял ответ. Напишите Да чтобы создать новое видео или Нет чтобы завершить.' : '❓ Не понял вас. Напишите /start чтобы начать.' }}",
         "additionalFields": {}
       },
       "id": "tg-06",
@@ -471,7 +511,13 @@
       "main": [[{ "node": "Code: Определить действие", "type": "main", "index": 0 }]]
     },
     "Code: Определить действие": {
-      "main": [[{ "node": "IF: Новый сценарий?", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "IF: Старт?", "type": "main", "index": 0 }]]
+    },
+    "IF: Старт?": {
+      "main": [
+        [{ "node": "Telegram: Добро пожаловать", "type": "main", "index": 0 }],
+        [{ "node": "IF: Новый сценарий?", "type": "main", "index": 0 }]
+      ]
     },
     "IF: Новый сценарий?": {
       "main": [
