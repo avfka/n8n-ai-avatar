@@ -3,47 +3,56 @@
   "nodes": [
     {
       "parameters": {
-        "updates": ["message"],
+        "updates": [
+          "message"
+        ],
         "additionalFields": {}
       },
       "id": "tg-01",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
-      "position": [0, 300],
+      "position": [
+        0,
+        300
+      ],
       "webhookId": "ai-avatar-telegram-trigger",
       "notes": "Получает любое сообщение. Токен бота — в Telegram API credential."
     },
     {
       "parameters": {
-        "jsCode": "const msg = $input.first().json.message;\nconst chatId = msg?.chat?.id?.toString();\nconst text = (msg?.text || '').trim();\nconst userId = msg?.from?.id?.toString();\n\nif (!chatId || !text) return [];\n\nconst state = $getWorkflowStaticData('global');\nconst userState = state[chatId] || { step: 'idle' };\n\nlet action = 'unknown';\nlet payload = {};\n\nif (text === '/start') {\n  action = 'start';\n  state[chatId] = { step: 'idle' };\n} else if (text === '/cancel') {\n  action = 'cancel';\n  state[chatId] = { step: 'idle' };\n} else if (userState.step === 'idle') {\n  if (text.length < 20) {\n    action = 'too_short';\n  } else if (text.length > 2000) {\n    action = 'too_long';\n    payload.length = text.length;\n  } else {\n    action = 'new_script';\n    payload.script = text;\n  }\n} else if (userState.step === 'waiting_approval') {\n  const lower = text.toLowerCase();\n  if (lower === 'да' || lower === 'ok' || lower === 'ок' || lower === 'го' || lower === '👍') {\n    action = 'approved';\n    payload.polishedScript = userState.polishedScript;\n  } else {\n    action = 'revision';\n    payload.originalScript = userState.originalScript;\n    payload.polishedScript = userState.polishedScript;\n    payload.feedback = text;\n  }\n} else if (userState.step === 'waiting_new_video') {\n  const lower = text.toLowerCase();\n  if (lower === 'да' || lower === 'yes' || lower === '👍') {\n    action = 'want_new';\n    state[chatId] = { step: 'idle' };\n  } else if (lower === 'нет' || lower === 'no' || lower === '👎') {\n    action = 'no_new';\n    state[chatId] = { step: 'idle' };\n  } else {\n    action = 'unexpected_new_video';\n  }\n} else {\n  action = 'unexpected';\n}\n\nreturn [{ json: { action, chatId, userId, text, payload, userState } }];"
+        "jsCode": "const msg = $input.first().json.message;\nconst chatId = msg?.chat?.id?.toString();\nconst text = (msg?.text || '').trim();\nconst userId = msg?.from?.id?.toString();\n\nif (!chatId || !text) return [];\n\nconst state = $getWorkflowStaticData('global');\nconst userState = state[chatId] || { step: 'idle' };\n\nlet action = 'unknown';\nlet payload = {};\n\nif (text === '/start') {\n  action = 'start';\n  state[chatId] = { step: 'idle' };\n} else if (text === '/cancel') {\n  action = 'cancel';\n  state[chatId] = { step: 'idle' };\n} else if (userState.step === 'idle') {\n  if (text.length < 20) {\n    action = 'too_short';\n  } else if (text.length > 2000) {\n    action = 'too_long';\n    payload.length = text.length;\n  } else {\n    action = 'new_script';\n    payload.script = text;\n  }\n} else if (userState.step === 'waiting_approval') {\n  const lower = text.toLowerCase();\n  if (lower === 'да' || lower === 'ok' || lower === 'ок' || lower === 'го' || lower === '👍') {\n    action = 'approved';\n    payload.polishedScript = userState.polishedScript;\n  } else {\n    action = 'revision';\n    payload.originalScript = userState.originalScript;\n    payload.polishedScript = userState.polishedScript;\n    payload.feedback = text;\n  }\n} else if (userState.step === 'waiting_new_video') {\n  const lower = text.toLowerCase();\n  if (lower === 'да' || lower === 'yes' || lower === '👍') {\n    action = 'want_new';\n    state[chatId] = { step: 'idle' };\n  } else if (lower === 'нет' || lower === 'no' || lower === '👎') {\n    action = 'no_new';\n    state[chatId] = { step: 'idle' };\n  } else {\n    action = 'unexpected_new_video';\n  }\n} else {\n  action = 'unexpected';\n}\n\nreturn [{ json: { action, chatId, userId, text, payload, userState, isInit: action === 'start' || action === 'cancel' } }];"
       },
       "id": "tg-02",
       "name": "Code: Определить действие",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 300],
+      "position": [
+        220,
+        300
+      ],
       "notes": "Читает состояние пользователя из staticData. Определяет что делать: новый сценарий, одобрение, правки, команда."
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
-              "id": "c-start",
-              "leftValue": "={{ $json.action }}",
-              "rightValue": "start",
-              "operator": { "type": "string", "operation": "equals" }
-            },
-            {
-              "id": "c-cancel",
-              "leftValue": "={{ $json.action }}",
-              "rightValue": "cancel",
-              "operator": { "type": "string", "operation": "equals" }
+              "id": "c-init",
+              "leftValue": "={{ $json.isInit }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ],
-          "combinator": "or"
+          "combinator": "and"
         },
         "options": {}
       },
@@ -51,7 +60,10 @@
       "name": "IF: Старт?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [440, 80]
+      "position": [
+        440,
+        80
+      ]
     },
     {
       "parameters": {
@@ -63,18 +75,28 @@
       "name": "Telegram: Добро пожаловать",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [660, 80]
+      "position": [
+        660,
+        80
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "c1",
               "leftValue": "={{ $json.action }}",
               "rightValue": "new_script",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -85,18 +107,28 @@
       "name": "IF: Новый сценарий?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [440, 300]
+      "position": [
+        440,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "c2",
               "leftValue": "={{ $json.action }}",
               "rightValue": "approved",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -107,18 +139,28 @@
       "name": "IF: Одобрено?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [440, 560]
+      "position": [
+        440,
+        560
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "c3",
               "leftValue": "={{ $json.action }}",
               "rightValue": "revision",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -129,7 +171,10 @@
       "name": "IF: Правки?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [440, 820]
+      "position": [
+        440,
+        820
+      ]
     },
     {
       "parameters": {
@@ -141,7 +186,10 @@
       "name": "Telegram: /start",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [660, 1060]
+      "position": [
+        660,
+        1060
+      ]
     },
     {
       "parameters": {
@@ -153,7 +201,10 @@
       "name": "Telegram: Статус — полировка",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [660, 300]
+      "position": [
+        660,
+        300
+      ]
     },
     {
       "parameters": {
@@ -174,7 +225,10 @@
       "name": "GPT: Полировка сценария",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [880, 300],
+      "position": [
+        880,
+        300
+      ],
       "notes": "Промпт можно переопределить через переменную AVATAR_SCRIPT_PROMPT в Settings → Variables."
     },
     {
@@ -196,7 +250,10 @@
       "name": "GPT: Применить правки",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 820]
+      "position": [
+        660,
+        820
+      ]
     },
     {
       "parameters": {
@@ -206,7 +263,10 @@
       "name": "Code: Сохранить черновик",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 560],
+      "position": [
+        1100,
+        560
+      ],
       "notes": "Сохраняет отполированный сценарий в staticData и переводит пользователя в состояние waiting_approval."
     },
     {
@@ -221,7 +281,10 @@
       "name": "Telegram: Показать сценарий",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1320, 560]
+      "position": [
+        1320,
+        560
+      ]
     },
     {
       "parameters": {
@@ -231,7 +294,10 @@
       "name": "Code: Запустить рендер",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 560],
+      "position": [
+        660,
+        560
+      ],
       "notes": "Берёт одобренный сценарий, сбрасывает состояние пользователя, передаёт дальше на рендер."
     },
     {
@@ -244,7 +310,10 @@
       "name": "Telegram: Статус — аудио",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [880, 560]
+      "position": [
+        880,
+        560
+      ]
     },
     {
       "parameters": {
@@ -253,8 +322,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "xi-api-key", "value": "YOUR_ELEVENLABS_API_KEY" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "xi-api-key",
+              "value": "YOUR_ELEVENLABS_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -270,14 +345,21 @@
           }
         },
         "options": {
-          "response": { "response": { "responseFormat": "file" } }
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
         }
       },
       "id": "tg-14",
       "name": "ElevenLabs: Генерация аудио",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, 560]
+      "position": [
+        1100,
+        560
+      ]
     },
     {
       "parameters": {
@@ -287,7 +369,10 @@
       "name": "Code: Подготовить аудио",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, 560]
+      "position": [
+        1320,
+        560
+      ]
     },
     {
       "parameters": {
@@ -296,8 +381,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "YOUR_HEYGEN_API_KEY" },
-            { "name": "Content-Type", "value": "audio/mpeg" }
+            {
+              "name": "X-Api-Key",
+              "value": "YOUR_HEYGEN_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "audio/mpeg"
+            }
           ]
         },
         "sendBody": true,
@@ -309,7 +400,10 @@
       "name": "HeyGen: Загрузить аудио",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, 560]
+      "position": [
+        1540,
+        560
+      ]
     },
     {
       "parameters": {
@@ -319,7 +413,10 @@
       "name": "Code: Извлечь asset ID",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1760, 560]
+      "position": [
+        1760,
+        560
+      ]
     },
     {
       "parameters": {
@@ -331,7 +428,10 @@
       "name": "Telegram: Статус — рендер",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1980, 560]
+      "position": [
+        1980,
+        560
+      ]
     },
     {
       "parameters": {
@@ -340,8 +440,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "YOUR_HEYGEN_API_KEY" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "X-Api-Key",
+              "value": "YOUR_HEYGEN_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -358,10 +464,16 @@
                 "type": "audio",
                 "audio_asset_id": "={{ $json.audioAssetId }}"
               },
-              "background": { "type": "color", "value": "#1a1a2e" }
+              "background": {
+                "type": "color",
+                "value": "#1a1a2e"
+              }
             }
           ],
-          "dimension": { "width": 1080, "height": 1920 },
+          "dimension": {
+            "width": 1080,
+            "height": 1920
+          },
           "caption": false
         },
         "options": {}
@@ -370,7 +482,10 @@
       "name": "HeyGen: Создать видео",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2200, 560]
+      "position": [
+        2200,
+        560
+      ]
     },
     {
       "parameters": {
@@ -380,15 +495,24 @@
       "name": "Code: Извлечь video ID",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2420, 560]
+      "position": [
+        2420,
+        560
+      ]
     },
     {
-      "parameters": { "amount": 30, "unit": "seconds" },
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
       "id": "tg-21",
       "name": "Wait 30s",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [2640, 560]
+      "position": [
+        2640,
+        560
+      ]
     },
     {
       "parameters": {
@@ -396,7 +520,12 @@
         "url": "=https://api.heygen.com/v1/video_status.get?video_id={{ $json.videoId }}",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [{ "name": "X-Api-Key", "value": "YOUR_HEYGEN_API_KEY" }]
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "YOUR_HEYGEN_API_KEY"
+            }
+          ]
         },
         "options": {}
       },
@@ -404,7 +533,10 @@
       "name": "HeyGen: Проверить статус",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2860, 560]
+      "position": [
+        2860,
+        560
+      ]
     },
     {
       "parameters": {
@@ -414,18 +546,28 @@
       "name": "Code: Разобрать статус",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3080, 560]
+      "position": [
+        3080,
+        560
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "cond-done",
               "leftValue": "={{ $json.status }}",
               "rightValue": "completed",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -436,15 +578,24 @@
       "name": "IF: Готово?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [3300, 560]
+      "position": [
+        3300,
+        560
+      ]
     },
     {
-      "parameters": { "amount": 30, "unit": "seconds" },
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
       "id": "tg-25",
       "name": "Wait 30s (retry)",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [3520, 760]
+      "position": [
+        3520,
+        760
+      ]
     },
     {
       "parameters": {
@@ -454,13 +605,24 @@
       "name": "Code: Подготовить имя файла",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3520, 420]
+      "position": [
+        3520,
+        420
+      ]
     },
     {
       "parameters": {
         "operation": "append",
-        "documentId": { "__rl": true, "value": "1SiJswwQtx0z8Z28mrO1ui1AjAXZBIIoV6BZWJ_xEZ_c", "mode": "id" },
-        "sheetName": { "__rl": true, "value": "Видео", "mode": "name" },
+        "documentId": {
+          "__rl": true,
+          "value": "1SiJswwQtx0z8Z28mrO1ui1AjAXZBIIoV6BZWJ_xEZ_c",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Видео",
+          "mode": "name"
+        },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
@@ -479,7 +641,10 @@
       "name": "Google Sheets: Логировать",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [3740, 420]
+      "position": [
+        3740,
+        420
+      ]
     },
     {
       "parameters": {
@@ -491,117 +656,361 @@
       "name": "Telegram: Отправить ссылку",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [3960, 420]
+      "position": [
+        3960,
+        420
+      ]
     },
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
         "text": "🎉 Хотите сгенерировать ещё одно видео?\n\nНапишите *Да* или *Нет*.",
-        "additionalFields": { "parse_mode": "Markdown" }
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
       },
       "id": "tg-29",
       "name": "Telegram: Спросить новое видео",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [4180, 420]
+      "position": [
+        4180,
+        420
+      ]
     }
   ],
   "connections": {
     "Telegram Trigger": {
-      "main": [[{ "node": "Code: Определить действие", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Code: Определить действие",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Code: Определить действие": {
-      "main": [[{ "node": "IF: Старт?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "IF: Старт?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "IF: Старт?": {
       "main": [
-        [{ "node": "Telegram: Добро пожаловать", "type": "main", "index": 0 }],
-        [{ "node": "IF: Новый сценарий?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Telegram: Добро пожаловать",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF: Новый сценарий?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "IF: Новый сценарий?": {
       "main": [
-        [{ "node": "Telegram: Статус — полировка", "type": "main", "index": 0 }],
-        [{ "node": "IF: Одобрено?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Telegram: Статус — полировка",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF: Одобрено?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "IF: Одобрено?": {
       "main": [
-        [{ "node": "Code: Запустить рендер", "type": "main", "index": 0 }],
-        [{ "node": "IF: Правки?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Code: Запустить рендер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF: Правки?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "IF: Правки?": {
       "main": [
-        [{ "node": "GPT: Применить правки", "type": "main", "index": 0 }],
-        [{ "node": "Telegram: /start", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "GPT: Применить правки",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: /start",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Telegram: Статус — полировка": {
-      "main": [[{ "node": "GPT: Полировка сценария", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "GPT: Полировка сценария",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "GPT: Полировка сценария": {
-      "main": [[{ "node": "Code: Сохранить черновик", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Code: Сохранить черновик",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "GPT: Применить правки": {
-      "main": [[{ "node": "Code: Сохранить черновик", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Code: Сохранить черновик",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Code: Сохранить черновик": {
-      "main": [[{ "node": "Telegram: Показать сценарий", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Telegram: Показать сценарий",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Code: Запустить рендер": {
-      "main": [[{ "node": "Telegram: Статус — аудио", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Telegram: Статус — аудио",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Telegram: Статус — аудио": {
-      "main": [[{ "node": "ElevenLabs: Генерация аудио", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "ElevenLabs: Генерация аудио",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "ElevenLabs: Генерация аудио": {
-      "main": [[{ "node": "Code: Подготовить аудио", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Code: Подготовить аудио",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Code: Подготовить аудио": {
-      "main": [[{ "node": "HeyGen: Загрузить аудио", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "HeyGen: Загрузить аудио",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "HeyGen: Загрузить аудио": {
-      "main": [[{ "node": "Code: Извлечь asset ID", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Code: Извлечь asset ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Code: Извлечь asset ID": {
-      "main": [[{ "node": "Telegram: Статус — рендер", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Telegram: Статус — рендер",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Telegram: Статус — рендер": {
-      "main": [[{ "node": "HeyGen: Создать видео", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "HeyGen: Создать видео",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "HeyGen: Создать видео": {
-      "main": [[{ "node": "Code: Извлечь video ID", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Code: Извлечь video ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Code: Извлечь video ID": {
-      "main": [[{ "node": "Wait 30s", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Wait 30s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Wait 30s": {
-      "main": [[{ "node": "HeyGen: Проверить статус", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "HeyGen: Проверить статус",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "HeyGen: Проверить статус": {
-      "main": [[{ "node": "Code: Разобрать статус", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Code: Разобрать статус",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Code: Разобрать статус": {
-      "main": [[{ "node": "IF: Готово?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "IF: Готово?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "IF: Готово?": {
       "main": [
-        [{ "node": "Code: Подготовить имя файла", "type": "main", "index": 0 }],
-        [{ "node": "Wait 30s (retry)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Code: Подготовить имя файла",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 30s (retry)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Wait 30s (retry)": {
-      "main": [[{ "node": "HeyGen: Проверить статус", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "HeyGen: Проверить статус",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Code: Подготовить имя файла": {
-      "main": [[{ "node": "Google Sheets: Логировать", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Google Sheets: Логировать",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Google Sheets: Логировать": {
-      "main": [[{ "node": "Telegram: Отправить ссылку", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Telegram: Отправить ссылку",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Telegram: Отправить ссылку": {
-      "main": [[{ "node": "Telegram: Спросить новое видео", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Telegram: Спросить новое видео",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -611,7 +1020,10 @@
     "errorWorkflow": ""
   },
   "staticData": null,
-  "meta": { "templateCredsSetupCompleted": false, "instanceId": "" },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  },
   "pinData": {},
   "versionId": "",
   "triggerCount": 1,
