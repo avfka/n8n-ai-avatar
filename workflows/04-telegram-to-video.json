@@ -453,31 +453,8 @@
           ]
         },
         "sendBody": true,
-        "contentType": "json",
-        "body": {
-          "video_inputs": [
-            {
-              "character": {
-                "type": "avatar",
-                "avatar_id": "YOUR_HEYGEN_AVATAR_ID",
-                "avatar_style": "normal"
-              },
-              "voice": {
-                "type": "audio",
-                "audio_asset_id": "={{ $json.audioAssetId }}"
-              },
-              "background": {
-                "type": "color",
-                "value": "#1a1a2e"
-              }
-            }
-          ],
-          "dimension": {
-            "width": 1080,
-            "height": 1920
-          },
-          "caption": false
-        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({video_inputs:[{character:{type:'avatar',avatar_id:'YOUR_HEYGEN_AVATAR_ID',avatar_style:'normal'},voice:{type:'audio',audio_asset_id:$('Code: Извлечь asset ID').first().json.audioAssetId},background:{type:'color',value:'#1a1a2e'}}],dimension:{width:1080,height:1920},caption:false,test:true}) }}",
         "options": {}
       },
       "id": "tg-19",
