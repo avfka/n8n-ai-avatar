@@ -437,6 +437,19 @@
     },
     {
       "parameters": {
+        "jsCode": "const prev = $input.first().json;\nconst response = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.heygen.com/v2/video/generate',\n  headers: {\n    'X-Api-Key': 'sk_V2_hgu_kETTuZnvTzy_DqRxB09L6kDYDkl2wlxBN2T2ejSrkeld',\n    'Content-Type': 'application/json'\n  },\n  body: {\n    video_inputs: [{\n      character: {type:'avatar', avatar_id:'715aa2df861d4321ac0556f8b1488c17', avatar_style:'normal'},\n      voice: {type:'audio', audio_asset_id: prev.audioAssetId},\n      background: {type:'color', value:'#1a1a2e'}\n    }],\n    dimension: {width:1080, height:1920},\n    caption: false,\n    test: true\n  },\n  json: true\n});\nreturn [{ json: { ...prev, heygenResponse: response } }];"
+      },
+      "id": "tg-19b",
+      "name": "Code: Подготовить тело HeyGen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        560
+      ]
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "https://api.heygen.com/v2/video/generate",
         "sendHeaders": true,
@@ -455,7 +468,8 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({video_inputs:[{character:{type:'avatar',avatar_id:'YOUR_HEYGEN_AVATAR_ID',avatar_style:'normal'},voice:{type:'audio',audio_asset_id:$('Code: Извлечь asset ID').first().json.audioAssetId},background:{type:'color',value:'#1a1a2e'}}],dimension:{width:1080,height:1920},caption:false,test:true}) }}",
-        "options": {}
+        "options": {},
+        "disabled": true
       },
       "id": "tg-19",
       "name": "HeyGen: Создать видео",
@@ -463,12 +477,12 @@
       "typeVersion": 4.2,
       "position": [
         2200,
-        560
+        760
       ]
     },
     {
       "parameters": {
-        "jsCode": "const resp = $input.first().json;\nconst prev = $('Code: Запустить рендер').first().json;\nif (resp.error) throw new Error('HeyGen error: ' + JSON.stringify(resp.error));\nconst videoId = resp?.data?.video_id || resp?.video_id;\nif (!videoId) throw new Error('video_id не получен: ' + JSON.stringify(resp));\nreturn [{ json: { ...prev, videoId, startedAt: new Date().toISOString() } }];"
+        "jsCode": "const resp = $('Code: Подготовить тело HeyGen').first().json.heygenResponse;\nconst prev = $('Code: Извлечь asset ID').first().json;\nif (resp?.error) throw new Error('HeyGen error: ' + JSON.stringify(resp.error));\nconst videoId = resp?.data?.video_id || resp?.video_id;\nif (!videoId) throw new Error('video_id не получен: ' + JSON.stringify(resp));\nreturn [{ json: { ...prev, videoId, startedAt: new Date().toISOString() } }];"
       },
       "id": "tg-20",
       "name": "Code: Извлечь video ID",
@@ -594,7 +608,7 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "1SiJswwQtx0z8Z28mrO1ui1AjAXZBIIoV6BZWJ_xEZ_c",
+          "value": "1djCMYtqytfb5ycrk8HNjkbeyOuh5fdD1J4curDGKlHg",
           "mode": "id"
         },
         "sheetName": {
@@ -867,14 +881,14 @@
       "main": [
         [
           {
-            "node": "HeyGen: Создать видео",
+            "node": "Code: Подготовить тело HeyGen",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HeyGen: Создать видео": {
+    "Code: Подготовить тело HeyGen": {
       "main": [
         [
           {
