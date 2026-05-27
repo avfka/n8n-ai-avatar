@@ -437,7 +437,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const prev = $input.first().json;\nconst response = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.heygen.com/v2/video/generate',\n  headers: {\n    'X-Api-Key': 'sk_V2_hgu_kETTuZnvTzy_DqRxB09L6kDYDkl2wlxBN2T2ejSrkeld',\n    'Content-Type': 'application/json'\n  },\n  body: {\n    video_inputs: [{\n      character: {type:'avatar', avatar_id:'715aa2df861d4321ac0556f8b1488c17', avatar_style:'normal'},\n      voice: {type:'audio', audio_asset_id: prev.audioAssetId},\n      background: {type:'color', value:'#1a1a2e'}\n    }],\n    dimension: {width:1080, height:1920},\n    caption: false,\n    test: true\n  },\n  json: true\n});\nreturn [{ json: { ...prev, heygenResponse: response } }];"
+        "jsCode": "const prev = $input.first().json;\nconst response = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.heygen.com/v2/video/generate',\n  headers: {\n    'X-Api-Key': 'sk_V2_hgu_kETTuZnvTzy_DqRxB09L6kDYDkl2wlxBN2T2ejSrkeld',\n    'Content-Type': 'application/json'\n  },\n  body: {\n    video_inputs: [{\n      character: {type:'avatar', avatar_id:'715aa2df861d4321ac0556f8b1488c17', avatar_style:'normal'},\n      voice: {type:'audio', audio_asset_id: prev.audioAssetId},\n      background: {type:'color', value:'#1a1a2e'}\n    }],\n    dimension: {width:1080, height:1920},\n    caption: false,\n    test: false\n  },\n  json: true\n});\nreturn [{ json: { ...prev, heygenResponse: response } }];"
       },
       "id": "tg-19b",
       "name": "Code: Подготовить тело HeyGen",
