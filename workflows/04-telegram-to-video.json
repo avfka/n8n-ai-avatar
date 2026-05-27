@@ -8,62 +8,36 @@
         ],
         "additionalFields": {}
       },
-      "id": "tg-01",
+      "id": "60cc9344-c6e9-4a06-9dd7-2eb26bfad505",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
       "position": [
-        0,
-        300
+        9856,
+        5152
       ],
       "webhookId": "ai-avatar-telegram-trigger",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      },
       "notes": "Получает любое сообщение. Токен бота — в Telegram API credential."
     },
     {
       "parameters": {
-        "jsCode": "const msg = $input.first().json.message;\nconst chatId = msg?.chat?.id?.toString();\nconst text = (msg?.text || '').trim();\nconst userId = msg?.from?.id?.toString();\n\nif (!chatId || !text) return [];\n\nconst state = $getWorkflowStaticData('global');\nconst userState = state[chatId] || { step: 'idle' };\n\nlet action = 'unknown';\nlet payload = {};\n\nif (text === '/start') {\n  action = 'start';\n  state[chatId] = { step: 'idle' };\n} else if (text === '/cancel') {\n  action = 'cancel';\n  state[chatId] = { step: 'idle' };\n} else if (userState.step === 'idle') {\n  if (text.length < 20) {\n    action = 'too_short';\n  } else if (text.length > 2000) {\n    action = 'too_long';\n    payload.length = text.length;\n  } else {\n    action = 'new_script';\n    payload.script = text;\n  }\n} else if (userState.step === 'waiting_approval') {\n  const lower = text.toLowerCase();\n  if (lower === 'да' || lower === 'ok' || lower === 'ок' || lower === 'го' || lower === '👍') {\n    action = 'approved';\n    payload.polishedScript = userState.polishedScript;\n  } else {\n    action = 'revision';\n    payload.originalScript = userState.originalScript;\n    payload.polishedScript = userState.polishedScript;\n    payload.feedback = text;\n  }\n} else if (userState.step === 'waiting_new_video') {\n  const lower = text.toLowerCase();\n  if (lower === 'да' || lower === 'yes' || lower === '👍') {\n    action = 'want_new';\n    state[chatId] = { step: 'idle' };\n  } else if (lower === 'нет' || lower === 'no' || lower === '👎') {\n    action = 'no_new';\n    state[chatId] = { step: 'idle' };\n  } else {\n    action = 'unexpected_new_video';\n  }\n} else {\n  action = 'unexpected';\n}\n\nreturn [{ json: { action, chatId, userId, text, payload, userState, isInit: action === 'start' || action === 'cancel' } }];"
+        "jsCode": "const msg = $input.first().json.message;\nconst chatId = msg?.chat?.id?.toString();\nconst text = (msg?.text || '').trim();\nconst userId = msg?.from?.id?.toString();\n\nif (!chatId || !text) return [];\n\nconst state = $getWorkflowStaticData('global');\nconst userState = state[chatId] || { step: 'idle' };\n\nlet action = 'unknown';\nlet payload = {};\n\nif (text === '/start') {\n  action = 'start';\n  state[chatId] = { step: 'idle' };\n} else if (text === '/cancel') {\n  action = 'cancel';\n  state[chatId] = { step: 'idle' };\n} else if (userState.step === 'idle') {\n  if (text.length < 20) {\n    action = 'too_short';\n  } else if (text.length > 2000) {\n    action = 'too_long';\n    payload.length = text.length;\n  } else {\n    action = 'new_script';\n    payload.script = text;\n  }\n} else if (userState.step === 'waiting_approval') {\n  const lower = text.toLowerCase();\n  if (lower === 'да' || lower === 'ok' || lower === 'ок' || lower === 'го' || lower === '👍') {\n    action = 'approved';\n    payload.polishedScript = userState.polishedScript;\n  } else {\n    action = 'revision';\n    payload.originalScript = userState.originalScript;\n    payload.polishedScript = userState.polishedScript;\n    payload.feedback = text;\n  }\n} else if (userState.step === 'waiting_new_video') {\n  const lower = text.toLowerCase();\n  if (lower === 'да' || lower === 'yes' || lower === '👍') {\n    action = 'want_new';\n    state[chatId] = { step: 'idle' };\n  } else if (lower === 'нет' || lower === 'no' || lower === '👎') {\n    action = 'no_new';\n    state[chatId] = { step: 'idle' };\n  } else {\n    action = 'unexpected_new_video';\n  }\n} else {\n  action = 'unexpected';\n}\nreturn [{ json: { action, chatId, userId, text, payload, userState, isInit: action === 'start' || action === 'cancel' } }];"
       },
-      "id": "tg-02",
+      "id": "114927f2-89fd-49ed-8440-b2b2fc611441",
       "name": "Code: Определить действие",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        220,
-        300
+        10064,
+        5152
       ],
       "notes": "Читает состояние пользователя из staticData. Определяет что делать: новый сценарий, одобрение, правки, команда."
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "c-init",
-              "leftValue": "={{ $json.isInit }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "tg-30",
-      "name": "IF: Старт?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        440,
-        80
-      ]
     },
     {
       "parameters": {
@@ -71,125 +45,21 @@
         "text": "👋 Привет! Отправьте мне черновик сценария для аватара.\n\nЯ его отполирую через GPT и покажу вам — вы сможете одобрить или попросить правки.\n\nОграничения: 20–2000 символов.",
         "additionalFields": {}
       },
-      "id": "tg-31",
+      "id": "dcf5dcb7-ee07-4231-b56b-45ff87aa1921",
       "name": "Telegram: Добро пожаловать",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        660,
-        80
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "c1",
-              "leftValue": "={{ $json.action }}",
-              "rightValue": "new_script",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "tg-03",
-      "name": "IF: Новый сценарий?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        440,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "c2",
-              "leftValue": "={{ $json.action }}",
-              "rightValue": "approved",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "tg-04",
-      "name": "IF: Одобрено?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        440,
-        560
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "c3",
-              "leftValue": "={{ $json.action }}",
-              "rightValue": "revision",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "tg-05",
-      "name": "IF: Правки?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        440,
-        820
-      ]
-    },
-    {
-      "parameters": {
-        "chatId": "={{ $json.chatId }}",
-        "text": "={{ $json.action === 'too_short' ? '❌ Сценарий слишком короткий. Минимум 20 символов — отправьте более длинный текст.' : $json.action === 'too_long' ? '❌ Сценарий слишком длинный (у вас ' + ($json.payload?.length || '') + ' симв., максимум 2000). Сократите текст.' : $json.action === 'want_new' ? '📝 Отлично! Отправьте новый сценарий.\n\nОграничения: 20–2000 символов.' : $json.action === 'no_new' ? '👌 Хорошо, буду ждать! Когда захотите снова — просто напишите /start' : $json.action === 'unexpected_new_video' ? '❓ Не понял ответ. Напишите Да чтобы создать новое видео или Нет чтобы завершить.' : '❓ Не понял вас. Напишите /start чтобы начать.' }}",
-        "additionalFields": {}
-      },
-      "id": "tg-06",
-      "name": "Telegram: /start",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        660,
-        1060
-      ]
+        10608,
+        4656
+      ],
+      "webhookId": "de7b8fbc-f33a-4cfb-8ff4-98cceb2ac7be",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
@@ -197,14 +67,21 @@
         "text": "✏️ Полирую ваш сценарий через GPT...",
         "additionalFields": {}
       },
-      "id": "tg-07",
+      "id": "3aa851e4-2d44-4c59-82fd-267d126ac163",
       "name": "Telegram: Статус — полировка",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        660,
-        300
-      ]
+        10608,
+        4880
+      ],
+      "webhookId": "b3855ea4-388f-4b17-a414-1301a6f1d082",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
@@ -221,14 +98,20 @@
         "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 800,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Ты — редактор сценариев для AI-видео аватаров. Полируй текст: убирай канцелярит, делай речь живой и разговорной, сохраняй смысл и факты. Только чистый текст для зачитывания — никаких ремарок, скобок, таймкодов, заголовков. Первое лицо, настоящее время.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Отполируй этот сценарий:\\n\\n{{ $('Code: Определить действие').first().json.payload.script }}\"\n    }\n  ]\n}",
         "options": {}
       },
-      "id": "tg-08",
+      "id": "6dbedab4-70df-40c4-837b-09e6508c4929",
       "name": "GPT: Полировка сценария",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        880,
-        300
+        10832,
+        4880
       ],
+      "credentials": {
+        "openAiApi": {
+          "id": "xGuobx9IYrF5sj8l",
+          "name": "OpenAI account 2"
+        }
+      },
       "notes": "Промпт можно переопределить через переменную AVATAR_SCRIPT_PROMPT в Settings → Variables."
     },
     {
@@ -246,26 +129,32 @@
         "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 800,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Ты — редактор сценариев для AI-видео аватаров. Полируй текст: убирай канцелярит, делай речь живой и разговорной, сохраняй смысл и факты. Только чистый текст для зачитывания — никаких ремарок, скобок, таймкодов, заголовков. Первое лицо, настоящее время.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Вот текущий сценарий:\\n\\n{{ $('Code: Определить действие').first().json.payload.polishedScript }}\\n\\nПравки от автора: {{ $('Code: Определить действие').first().json.payload.feedback }}\\n\\nПереработай сценарий с учётом правок.\"\n    }\n  ]\n}",
         "options": {}
       },
-      "id": "tg-09",
+      "id": "2efdaedb-fd3c-4087-a3df-567065dc8950",
       "name": "GPT: Применить правки",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        660,
-        820
-      ]
+        10608,
+        5376
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "xGuobx9IYrF5sj8l",
+          "name": "OpenAI account 2"
+        }
+      }
     },
     {
       "parameters": {
         "jsCode": "const gptResp = $input.first().json;\nconst prev = $('Code: Определить действие').first().json;\n\nconst polished = gptResp.choices[0].message.content.trim();\nif (!polished || polished.length < 20) throw new Error('GPT вернул пустой результат');\n\n// Сохраняем состояние\nconst state = $getWorkflowStaticData('global');\nstate[prev.chatId] = {\n  step: 'waiting_approval',\n  originalScript: prev.payload.script || prev.userState?.originalScript,\n  polishedScript: polished\n};\n\nreturn [{\n  json: {\n    chatId: prev.chatId,\n    polished,\n    originalScript: prev.payload.script || prev.userState?.originalScript\n  }\n}];"
       },
-      "id": "tg-10",
+      "id": "ff627598-ad52-4a0b-9ecb-ca5d77345a03",
       "name": "Code: Сохранить черновик",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1100,
-        560
+        11088,
+        4880
       ],
       "notes": "Сохраняет отполированный сценарий в staticData и переводит пользователя в состояние waiting_approval."
     },
@@ -277,26 +166,33 @@
           "parse_mode": "Markdown"
         }
       },
-      "id": "tg-11",
+      "id": "c32cca61-2ec9-4593-bad2-f48e1ad93852",
       "name": "Telegram: Показать сценарий",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1320,
-        560
-      ]
+        11296,
+        4880
+      ],
+      "webhookId": "4bc5efbc-0799-4f4d-93c0-659c22159c31",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
         "jsCode": "const prev = $('Code: Определить действие').first().json;\nconst script = prev.payload.polishedScript;\nconst chatId = prev.chatId;\n\n// Сбрасываем состояние — процесс запущен\nconst state = $getWorkflowStaticData('global');\nstate[chatId] = { step: 'idle' };\n\nreturn [{\n  json: { script, chatId, scriptLength: script.length, receivedAt: new Date().toISOString() }\n}];"
       },
-      "id": "tg-12",
+      "id": "40ac32da-e591-4170-ac47-89f1a557fdbc",
       "name": "Code: Запустить рендер",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        660,
-        560
+        10608,
+        5152
       ],
       "notes": "Берёт одобренный сценарий, сбрасывает состояние пользователя, передаёт дальше на рендер."
     },
@@ -306,43 +202,49 @@
         "text": "⏳ Принято! Пожалуйста, подождите — генерирую видео. Я напишу, как только оно будет готово!",
         "additionalFields": {}
       },
-      "id": "tg-13",
+      "id": "d57755ba-da6f-45fe-aace-de423abfd698",
       "name": "Telegram: Статус — аудио",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        880,
-        560
-      ]
+        10944,
+        5152
+      ],
+      "webhookId": "539103e5-c4c1-4c6a-9914-bb70e74f334f",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.elevenlabs.io/v1/text-to-speech/YOUR_ELEVENLABS_VOICE_ID",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "xi-api-key",
-              "value": "YOUR_ELEVENLABS_API_KEY"
+              "value": "sk_dacefa610d043fe444e23e312a18264691305cba61f3ca21"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
         },
         "sendBody": true,
-        "contentType": "json",
         "bodyParameters": {
           "parameters": [
             {
               "name": "text",
-              "value": "={{ $('Code: Запустить рендер').first().json.script }}"
+              "value": "={{ $json.script }}"
             },
             {
               "name": "model_id",
               "value": "eleven_multilingual_v2"
-            },
-            {
-              "name": "voice_settings",
-              "value": "={{ ({stability: 0.5, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true}) }}"
             }
           ]
         },
@@ -354,26 +256,27 @@
           }
         }
       },
-      "id": "tg-14",
+      "id": "7f864e50-8dd3-4413-87d8-b8eaca3472e5",
       "name": "ElevenLabs: Генерация аудио",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
-        560
-      ]
+        11328,
+        5152
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
         "jsCode": "const audioData = $input.first().binary?.data;\nconst prev = $('Code: Запустить рендер').first().json;\nif (!audioData) throw new Error('ElevenLabs не вернул аудио');\nreturn [{ json: { ...prev, audioMimeType: audioData.mimeType || 'audio/mpeg' }, binary: { data: audioData } }];"
       },
-      "id": "tg-15",
+      "id": "88846234-8844-44d1-bf3e-cbd74465b711",
       "name": "Code: Подготовить аудио",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
-        560
+        11600,
+        5136
       ]
     },
     {
@@ -385,7 +288,7 @@
           "parameters": [
             {
               "name": "X-Api-Key",
-              "value": "YOUR_HEYGEN_API_KEY"
+              "value": "sk_V2_hgu_kETTuZnvTzy_DqRxB09L6kDYDkl2wlxBN2T2ejSrkeld"
             },
             {
               "name": "Content-Type",
@@ -398,26 +301,26 @@
         "inputDataFieldName": "data",
         "options": {}
       },
-      "id": "tg-16",
+      "id": "4475f848-d5d7-4a78-a728-2b3e391dbf9a",
       "name": "HeyGen: Загрузить аудио",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1540,
-        560
+        11808,
+        5136
       ]
     },
     {
       "parameters": {
         "jsCode": "const uploadResp = $input.first().json;\nconst prev = $('Code: Запустить рендер').first().json;\nconst audioAssetId = uploadResp?.data?.id || uploadResp?.id;\nif (!audioAssetId) throw new Error('HeyGen не вернул audio_asset_id: ' + JSON.stringify(uploadResp));\nreturn [{ json: { ...prev, audioAssetId } }];"
       },
-      "id": "tg-17",
+      "id": "52397ebc-5a0d-4cbc-8061-175df3e72041",
       "name": "Code: Извлечь asset ID",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1760,
-        560
+        12016,
+        5136
       ]
     },
     {
@@ -426,27 +329,21 @@
         "text": "🎬 Аудио готово. Запускаю рендер видео в HeyGen...",
         "additionalFields": {}
       },
-      "id": "tg-18",
+      "id": "4b1224cb-4638-49f0-82bc-388578cd254a",
       "name": "Telegram: Статус — рендер",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1980,
-        560
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const prev = $input.first().json;\nconst response = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.heygen.com/v2/video/generate',\n  headers: {\n    'X-Api-Key': 'sk_V2_hgu_kETTuZnvTzy_DqRxB09L6kDYDkl2wlxBN2T2ejSrkeld',\n    'Content-Type': 'application/json'\n  },\n  body: {\n    video_inputs: [{\n      character: {type:'avatar', avatar_id:'715aa2df861d4321ac0556f8b1488c17', avatar_style:'normal'},\n      voice: {type:'audio', audio_asset_id: prev.audioAssetId},\n      background: {type:'color', value:'#1a1a2e'}\n    }],\n    dimension: {width:1080, height:1920},\n    caption: false,\n    test: false\n  },\n  json: true\n});\nreturn [{ json: { ...prev, heygenResponse: response } }];"
-      },
-      "id": "tg-19b",
-      "name": "Code: Подготовить тело HeyGen",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2200,
-        560
-      ]
+        12224,
+        5136
+      ],
+      "webhookId": "7be25d98-09b7-4311-b225-21dfa5a9a056",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
@@ -457,7 +354,7 @@
           "parameters": [
             {
               "name": "X-Api-Key",
-              "value": "YOUR_HEYGEN_API_KEY"
+              "value": "sk_V2_hgu_kETTuZnvTzy_DqRxB09L6kDYDkl2wlxBN2T2ejSrkeld"
             },
             {
               "name": "Content-Type",
@@ -466,82 +363,82 @@
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({video_inputs:[{character:{type:'avatar',avatar_id:'YOUR_HEYGEN_AVATAR_ID',avatar_style:'normal'},voice:{type:'audio',audio_asset_id:$('Code: Извлечь asset ID').first().json.audioAssetId},background:{type:'color',value:'#1a1a2e'}}],dimension:{width:1080,height:1920},caption:false,test:true}) }}",
-        "options": {},
-        "disabled": true
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "=$('Code: Подготовить тело HeyGen').first().json.heygenBody",
+        "options": {}
       },
-      "id": "tg-19",
+      "id": "bd12f05f-8e7f-43ae-9b43-42aa74bc3134",
       "name": "HeyGen: Создать видео",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2200,
-        760
-      ]
+        12464,
+        4944
+      ],
+      "disabled": true
     },
     {
       "parameters": {
         "jsCode": "const resp = $('Code: Подготовить тело HeyGen').first().json.heygenResponse;\nconst prev = $('Code: Извлечь asset ID').first().json;\nif (resp?.error) throw new Error('HeyGen error: ' + JSON.stringify(resp.error));\nconst videoId = resp?.data?.video_id || resp?.video_id;\nif (!videoId) throw new Error('video_id не получен: ' + JSON.stringify(resp));\nreturn [{ json: { ...prev, videoId, startedAt: new Date().toISOString() } }];"
       },
-      "id": "tg-20",
+      "id": "0895ef4e-065b-49c7-8027-0a674828c4f5",
       "name": "Code: Извлечь video ID",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2420,
-        560
+        12752,
+        5120
       ]
     },
     {
       "parameters": {
-        "amount": 30,
-        "unit": "seconds"
+        "amount": 30
       },
-      "id": "tg-21",
+      "id": "08db214a-c81f-40ca-9391-732d0d534efd",
       "name": "Wait 30s",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        2640,
-        560
-      ]
+        13008,
+        5120
+      ],
+      "webhookId": "8093f367-8463-45c6-ae5d-40cd5a5d4165"
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "=https://api.heygen.com/v1/video_status.get?video_id={{ $json.videoId }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "X-Api-Key",
-              "value": "YOUR_HEYGEN_API_KEY"
+              "value": "sk_V2_hgu_kETTuZnvTzy_DqRxB09L6kDYDkl2wlxBN2T2ejSrkeld"
             }
           ]
         },
         "options": {}
       },
-      "id": "tg-22",
+      "id": "932f9745-3bbe-4284-a266-b29c8b59ca8e",
       "name": "HeyGen: Проверить статус",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2860,
-        560
+        13248,
+        5120
       ]
     },
     {
       "parameters": {
         "jsCode": "const statusResp = $input.first().json;\nconst prev = $('Code: Извлечь video ID').first().json;\nconst pollCount = ($input.first().json.pollCount || 0) + 1;\nconst status = statusResp?.data?.status || statusResp?.status;\nconst videoUrl = statusResp?.data?.video_url || statusResp?.video_url || null;\nconst thumbnailUrl = statusResp?.data?.thumbnail_url || null;\nif (status === 'failed') throw new Error('HeyGen рендер завершился ошибкой: ' + JSON.stringify(statusResp));\nif (pollCount > 24) throw new Error(`HeyGen не завершил рендер за 12 минут (${pollCount} попыток). Проверьте видео вручную: ${prev.videoId}`);\nreturn [{ json: { ...prev, status, videoUrl, thumbnailUrl, checkedAt: new Date().toISOString(), pollCount } }];"
       },
-      "id": "tg-23",
+      "id": "7b8a6c05-5423-4304-87ef-b5dc693d0887",
       "name": "Code: Разобрать статус",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3080,
-        560
+        13456,
+        5120
       ]
     },
     {
@@ -550,7 +447,8 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "strict",
+            "version": 1
           },
           "conditions": [
             {
@@ -567,40 +465,40 @@
         },
         "options": {}
       },
-      "id": "tg-24",
+      "id": "26b112b8-93ac-49c9-aa16-43d2af15eb95",
       "name": "IF: Готово?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        3300,
-        560
+        13664,
+        5120
       ]
     },
     {
       "parameters": {
-        "amount": 30,
-        "unit": "seconds"
+        "amount": 30
       },
-      "id": "tg-25",
+      "id": "652da4dc-31a6-4a65-94da-91579cbc0328",
       "name": "Wait 30s (retry)",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        3520,
-        760
-      ]
+        13904,
+        5280
+      ],
+      "webhookId": "0662576b-c33f-4889-834e-4bd03fa92a93"
     },
     {
       "parameters": {
         "jsCode": "const json = $input.first().json;\nconst state = $getWorkflowStaticData('global');\nstate[json.chatId] = { step: 'waiting_new_video' };\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);\nconst filename = `${timestamp}_avatar.mp4`;\nreturn [{ json: { ...json, filename, savedAt: new Date().toISOString() } }];"
       },
-      "id": "tg-26",
+      "id": "84e67828-86c7-4d0c-87d2-7c940e7db8a4",
       "name": "Code: Подготовить имя файла",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3520,
-        420
+        13904,
+        5104
       ]
     },
     {
@@ -626,52 +524,454 @@
             "Video URL": "={{ $json.videoUrl }}",
             "Файл": "={{ $json.filename }}",
             "Статус": "completed"
-          }
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Дата",
+              "displayName": "Дата",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Сценарий",
+              "displayName": "Сценарий",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Длина (символы)",
+              "displayName": "Длина (символы)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Video ID",
+              "displayName": "Video ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Video URL",
+              "displayName": "Video URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Файл",
+              "displayName": "Файл",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Статус",
+              "displayName": "Статус",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {}
       },
-      "id": "tg-27",
+      "id": "f07b3483-2632-4a8b-9159-87c05c318618",
       "name": "Google Sheets: Логировать",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
       "position": [
-        3740,
-        420
-      ]
+        14128,
+        5104
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ZLnCNW9SsU5sIF3c",
+          "name": "Google Sheets account 2"
+        }
+      }
     },
     {
       "parameters": {
-        "chatId": "={{ $json.chatId }}",
-        "text": "=✅ Видео готово!\n\n🎬 Смотреть / скачать:\n{{ $json.videoUrl }}\n\n📝 Символов в сценарии: {{ $json.scriptLength }}\n🆔 Video ID: {{ $json.videoId }}",
+        "chatId": "=={{ $('Code: Запустить рендер').first().json.chatId }}",
+        "text": "=✅ Видео готово!\n\n🎬 Смотреть / скачать:\n{{ $('Code: Подготовить имя файла').first().json.videoUrl }}\n\n📝 Символов в сценарии: {{ $('Code: Подготовить имя файла').first().json.scriptLength }}\n🆔 Video ID: {{ $('Code: Подготовить имя файла').first().json.videoId }}",
         "additionalFields": {}
       },
-      "id": "tg-28",
+      "id": "7616ce49-be12-4ec4-8b8b-8841441a20b2",
       "name": "Telegram: Отправить ссылку",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        3960,
-        420
-      ]
+        14336,
+        5104
+      ],
+      "webhookId": "844dc9cc-2212-47cd-aa05-d2d25f72761c",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
-        "chatId": "={{ $json.chatId }}",
+        "chatId": "=={{ $('Code: Запустить рендер').first().json.chatId }}",
         "text": "🎉 Хотите сгенерировать ещё одно видео?\n\nНапишите *Да* или *Нет*.",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
       },
-      "id": "tg-29",
+      "id": "6b3bd50e-0ab9-4ab5-8710-21fba8f3cd80",
       "name": "Telegram: Спросить новое видео",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        4180,
-        420
-      ]
+        14560,
+        5104
+      ],
+      "webhookId": "521f1429-2e1c-45b0-b65a-3c9b1ea95ebc",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "da370c8a-5500-4613-86ce-ff6d80cf091f"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Старт"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "53b521f2-61d1-4783-92a2-f236c21e8184",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "cancel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Отмена"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d2350797-3cbb-4800-869c-69327fdcc473",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "new_script",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Новый сценарий"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "68736e0c-31ef-4e2c-b3c8-83d047e1447f",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "approved",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Одобрено"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2c7b55b2-63e0-4eec-a703-8e6182799e2a",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "revision",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Правки"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "4ac0f283-7f2f-4905-8ee8-d12f8926f08c",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "too_short",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Слишком короткий"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e446df9a-8003-4ff0-9956-d7e9a71fc837",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "too_long",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Слишком длинный"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        10272,
+        5072
+      ],
+      "id": "8a21b0dc-6d4c-4348-a1ae-8fa134a4587f",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "❌ Слишком короткий. Минимум 20 символов, попробуйте снова.",
+        "additionalFields": {}
+      },
+      "id": "16fc0884-72b2-4162-86e1-286a6d483e77",
+      "name": "Telegram: Слишком короткий",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        10448,
+        5536
+      ],
+      "webhookId": "b3855ea4-388f-4b17-a414-1301a6f1d082",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "❌ Слишком длинный. Максимум 2000 символов, сократите текст.",
+        "additionalFields": {}
+      },
+      "id": "836dfe5b-05dd-4c53-bd9b-12c54bc02169",
+      "name": "Telegram: Слишком длинный",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        10448,
+        5712
+      ],
+      "webhookId": "b3855ea4-388f-4b17-a414-1301a6f1d082",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const https = require('https');\nconst prev = $('Code: Извлечь asset ID').first().json;\n\nconst body = JSON.stringify({\n  video_inputs: [{\n    character: {type: 'avatar', avatar_id: '715aa2df861d4321ac0556f8b1488c17', avatar_style: 'normal'},\n    voice: {type: 'audio', audio_asset_id: prev.audioAssetId},\n    background: {type: 'color', value: '#1a1a2e'}\n  }],\n  dimension: {width: 1080, height: 1920},\n  caption: false,\n  test: false\n});\n\nconst data = await new Promise((resolve, reject) => {\n  const req = https.request({\n    hostname: 'api.heygen.com',\n    path: '/v2/video/generate',\n    method: 'POST',\n    headers: {\n      'X-Api-Key': 'sk_V2_hgu_kETTuZnvTzy_DqRxB09L6kDYDkl2wlxBN2T2ejSrkeld',\n      'Content-Type': 'application/json',\n      'Content-Length': Buffer.byteLength(body)\n    }\n  }, (res) => {\n    let raw = '';\n    res.on('data', chunk => raw += chunk);\n    res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(e); } });\n  });\n  req.on('error', reject);\n  req.write(body);\n  req.end();\n});\nif (data?.error) {\n  throw new Error('HeyGen: ' + (data.error?.message || JSON.stringify(data.error)));\n}\nreturn [{ json: { ...prev, heygenResponse: data } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12448,
+        5136
+      ],
+      "id": "cc9f4ad4-c46b-444c-9477-73178d8befdc",
+      "name": "Code: Подготовить тело HeyGen",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Code: Запустить рендер').first().json.chatId }}",
+        "text": "❌ Закончились кредиты ElevenLabs или истекла подписка. Пополните баланс на elevenlabs.io",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        11600,
+        5296
+      ],
+      "id": "dd1f45af-fe87-434d-9933-7bec42391d32",
+      "name": "Telegram: ошибка ElevenLabs",
+      "webhookId": "22a56144-4f6c-4957-9554-3ee79ab6742a",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Code: Извлечь asset ID').first().json.chatId }}",
+        "text": "={{ $json.error?.message?.match(/credit|quota|billing|insufficient/i) ? '❌ Закончились кредиты HeyGen. Пополните баланс на heygen.com' : '❌ Ошибка HeyGen: ' + $json.error?.message }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        12752,
+        5280
+      ],
+      "id": "bde6a5df-7c77-4028-a605-e7eb861dff48",
+      "name": "Telegram: Ошибка HeyGen",
+      "webhookId": "45bdf387-ce5b-42d5-891b-6fcf5f6cdad1",
+      "credentials": {
+        "telegramApi": {
+          "id": "UYU2INDj1AkN4VRb",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Code: Запустить рендер').first().json;\nreturn [{ json: { script: prev.script, chatId: prev.chatId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11152,
+        5152
+      ],
+      "id": "65b2ab91-4764-47a5-ac58-a722a33011e6",
+      "name": "Code: Подготовить текст ElevenLabs"
     }
   ],
+  "pinData": {},
   "connections": {
     "Telegram Trigger": {
       "main": [
@@ -688,79 +988,7 @@
       "main": [
         [
           {
-            "node": "IF: Старт?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IF: Старт?": {
-      "main": [
-        [
-          {
-            "node": "Telegram: Добро пожаловать",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "IF: Новый сценарий?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IF: Новый сценарий?": {
-      "main": [
-        [
-          {
-            "node": "Telegram: Статус — полировка",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "IF: Одобрено?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IF: Одобрено?": {
-      "main": [
-        [
-          {
-            "node": "Code: Запустить рендер",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "IF: Правки?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IF: Правки?": {
-      "main": [
-        [
-          {
-            "node": "GPT: Применить правки",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Telegram: /start",
+            "node": "Switch1",
             "type": "main",
             "index": 0
           }
@@ -826,7 +1054,7 @@
       "main": [
         [
           {
-            "node": "ElevenLabs: Генерация аудио",
+            "node": "Code: Подготовить текст ElevenLabs",
             "type": "main",
             "index": 0
           }
@@ -838,6 +1066,13 @@
         [
           {
             "node": "Code: Подготовить аудио",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: ошибка ElevenLabs",
             "type": "main",
             "index": 0
           }
@@ -888,7 +1123,7 @@
         ]
       ]
     },
-    "Code: Подготовить тело HeyGen": {
+    "HeyGen: Создать видео": {
       "main": [
         [
           {
@@ -1004,21 +1239,115 @@
           }
         ]
       ]
+    },
+    "Telegram: Добро пожаловать": {
+      "main": [
+        []
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Добро пожаловать",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Добро пожаловать",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Статус — полировка",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Запустить рендер",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GPT: Применить правки",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Слишком короткий",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Слишком длинный",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: Показать сценарий": {
+      "main": [
+        []
+      ]
+    },
+    "Telegram: Спросить новое видео": {
+      "main": [
+        []
+      ]
+    },
+    "Code: Подготовить тело HeyGen": {
+      "main": [
+        [
+          {
+            "node": "Code: Извлечь video ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Ошибка HeyGen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Подготовить текст ElevenLabs": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs: Генерация аудио",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
+  "active": true,
   "settings": {
     "executionOrder": "v1",
-    "saveManualExecutions": true,
-    "callerPolicy": "workflowsFromSameOwner",
-    "errorWorkflow": ""
+    "binaryMode": "separate"
   },
-  "staticData": null,
+  "versionId": "066d421e-71aa-45a5-9bdb-db6dbcff9336",
   "meta": {
-    "templateCredsSetupCompleted": false,
-    "instanceId": ""
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f45985f130cc42340a4fd6672795db0dfb7fbfc2fae0f5c913583ccd246fe206"
   },
-  "pinData": {},
-  "versionId": "",
-  "triggerCount": 1,
+  "id": "0lZZ9wVFvgJtlcc5",
   "tags": []
 }
